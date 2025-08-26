@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Assistant 服务管理</title>
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --success-color: #4CAF50;
+            --error-color: #f44336;
+            --warning-color: #ff9800;
+            --bg-color: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-primary: #333;
+            --text-secondary: #666;
+            --border-color: #ddd;
+            --border-radius: 8px;
+            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: var(--primary-color);
+            font-size: 2rem;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .connection-status.connected {
+            background: rgba(76, 175, 80, 0.1);
+            color: var(--success-color);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .connection-status.disconnected {
+            background: rgba(244, 67, 54, 0.1);
+            color: var(--error-color);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 20px;
+        }
+
+        .card h2 {
+            margin-bottom: 15px;
+            color: var(--text-primary);
+            font-size: 1.3rem;
+        }
+
+        .service-status {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            padding: 15px;
+            border-radius: var(--border-radius);
+            background: rgba(0,0,0,0.02);
+            border: 1px solid var(--border-color);
+        }
+
+        .status-item h3 {
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .status-value.running {
+            color: var(--success-color);
+        }
+
+        .status-value.stopped {
+            color: var(--error-color);
+        }
+
+        .status-value.starting {
+            color: var(--warning-color);
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #1976D2;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #45a049;
+            transform: translateY(-1px);
+        }
+
+        .btn-warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .btn-warning:hover:not(:disabled) {
+            background: #f57c00;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: var(--error-color);
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #d32f2f;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #545b62;
+            transform: translateY(-1px);
+        }
+
+        .btn.loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            margin: auto;
+            border: 2px solid transparent;
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .btn.loading {
+            color: transparent;
+        }
+
+        .terminal {
+            height: 400px;
+            overflow-y: auto;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .terminal::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .terminal::-webkit-scrollbar-track {
+            background: #2d2d2d;
+        }
+
+        .terminal::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        .terminal::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 5px 0;
+            border-left: 3px solid transparent;
+            padding-left: 10px;
+        }
+
+        .log-entry.stdout {
+            border-left-color: #4CAF50;
+        }
+
+        .log-entry.stderr {
+            border-left-color: #f44336;
+            color: #ff6b6b;
+        }
+
+        .log-entry.info {
+            border-left-color: #2196F3;
+            color: #64b5f6;
+        }
+
+        .log-entry.warning {
+            border-left-color: #ff9800;
+            color: #ffb74d;
+        }
+
+        .log-timestamp {
+            color: #888;
+            font-size: 0.8rem;
+            margin-right: 10px;
+        }
+
+        .advanced-controls {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0,0,0,0.02);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+        }
+
+        .advanced-controls.show {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+        }
+
+        .toggle-advanced {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            font-size: 0.9rem;
+            text-decoration: underline;
+            margin-top: 10px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin-bottom: 15px;
+            border: 1px solid;
+        }
+
+        .alert.success {
+            background: rgba(76, 175, 80, 0.1);
+            border-color: rgba(76, 175, 80, 0.3);
+            color: var(--success-color);
+        }
+
+        .alert.error {
+            background: rgba(244, 67, 54, 0.1);
+            border-color: rgba(244, 67, 54, 0.3);
+            color: var(--error-color);
+        }
+
+        .alert.info {
+            background: rgba(33, 150, 243, 0.1);
+            border-color: rgba(33, 150, 243, 0.3);
+            color: var(--primary-color);
+        }
+
+        .clear-terminal {
+            float: right;
+            background: none;
+            border: 1px solid #555;
+            color: #d4d4d4;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+        }
+
+        .clear-terminal:hover {
+            background: #555;
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .service-status {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Home Assistant 服务管理</h1>
+            <div class="connection-status" id="connectionStatus">
+                <div class="status-indicator"></div>
+                <span>连接中...</span>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <div class="card">
+                <h2>服务状态</h2>
+                <div id="alerts"></div>
+                <div class="service-status" id="serviceStatus">
+                    <div class="status-item">
+                        <h3>运行状态</h3>
+                        <div class="status-value" id="runStatus">检查中...</div>
+                    </div>
+                    <div class="status-item">
+                        <h3>安装状态</h3>
+                        <div class="status-value" id="installStatus">检查中...</div>
+                    </div>
+                    <div class="status-item">
+                        <h3>当前版本</h3>
+                        <div class="status-value" id="currentVersion">获取中...</div>
+                    </div>
+                    <div class="status-item">
+                        <h3>HTTP端口</h3>
+                        <div class="status-value" id="httpStatus">检查中...</div>
+                    </div>
+                </div>
+
+                <h2>控制面板</h2>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="executeScript('autocheck')">状态检查</button>
+                    <button class="btn btn-success" onclick="executeScript('start')">启动服务</button>
+                    <button class="btn btn-warning" onclick="executeScript('stop')">停止服务</button>
+                    <button class="btn btn-secondary" onclick="executeScript('backup')">创建备份</button>
+                </div>
+
+                <button class="toggle-advanced" onclick="toggleAdvanced()">显示高级选项</button>
+
+                <div class="advanced-controls" id="advancedControls">
+                    <h3>高级操作</h3>
+                    <div class="controls">
+                        <button class="btn btn-primary" onclick="showInstallDialog()">安装服务</button>
+                        <button class="btn btn-primary" onclick="showUpdateDialog()">更新服务</button>
+                        <button class="btn btn-warning" onclick="showRestoreDialog()">还原配置</button>
+                        <button class="btn btn-danger" onclick="executeScript('uninstall')">卸载服务</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    执行日志
+                    <button class="clear-terminal" onclick="clearTerminal()">清除日志</button>
+                </h2>
+                <div class="terminal" id="terminal"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class HAServiceManager {
+            constructor() {
+                this.ws = null;
+                this.apiBase = window.location.origin;
+                this.terminal = document.getElementById('terminal');
+                this.connectionStatus = document.getElementById('connectionStatus');
+                this.currentExecutions = new Set();
+                
+                this.initWebSocket();
+                this.loadServiceStatus();
+                
+                // 定期刷新状态
+                setInterval(() => this.loadServiceStatus(), 30000);
+            }
+
+            initWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}`;
+                
+                this.ws = new WebSocket(wsUrl);
+                
+                this.ws.onopen = () => {
+                    this.updateConnectionStatus(true);
+                    this.addTerminalLog('WebSocket连接已建立', 'info');
+                };
+                
+                this.ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        this.handleWebSocketMessage(data);
+                    } catch (error) {
+                        console.error('解析WebSocket消息失败:', error);
+                    }
+                };
+                
+                this.ws.onclose = () => {
+                    this.updateConnectionStatus(false);
+                    this.addTerminalLog('WebSocket连接已断开', 'warning');
+                    
+                    // 5秒后尝试重连
+                    setTimeout(() => {
+                        if (this.ws.readyState === WebSocket.CLOSED) {
+                            this.addTerminalLog('尝试重新连接...', 'info');
+                            this.initWebSocket();
+                        }
+                    }, 5000);
+                };
+                
+                this.ws.onerror = (error) => {
+                    console.error('WebSocket错误:', error);
+                    this.addTerminalLog('WebSocket连接错误', 'stderr');
+                };
+            }
+
+            updateConnectionStatus(connected) {
+                const status = this.connectionStatus;
+                if (connected) {
+                    status.className = 'connection-status connected';
+                    status.innerHTML = '<div class="status-indicator"></div><span>已连接</span>';
+                } else {
+                    status.className = 'connection-status disconnected';
+                    status.innerHTML = '<div class="status-indicator"></div><span>已断开</span>';
+                }
+            }
+
+            handleWebSocketMessage(data) {
+                switch (data.type) {
+                    case 'connection':
+                        this.addTerminalLog(`连接确认: ${data.status}`, 'info');
+                        break;
+                    
+                    case 'script_start':
+                        this.addTerminalLog(`开始执行: ${data.script}`, 'info');
+                        this.setButtonLoading(data.script, true);
+                        break;
+                    
+                    case 'script_output':
+                        this.addTerminalLog(data.data, data.output_type, false);
+                        break;
+                    
+                    case 'script_complete':
+                        this.addTerminalLog(`执行完成: ${data.script} (退出码: ${data.exitCode})`, 
+                            data.success ? 'info' : 'stderr');
+                        this.setButtonLoading(data.script, false);
+                        this.currentExecutions.delete(data.script);
+                        
+                        // 显示结果提醒
+                        this.showAlert(
+                            data.success ? 'success' : 'error',
+                            `${data.script} ${data.success ? '执行成功' : '执行失败'}`
+                        );
+                        
+                        // 如果是状态检查，刷新状态显示
+                        if (data.script === 'autocheck') {
+                            setTimeout(() => this.loadServiceStatus(), 1000);
+                        }
+                        break;
+                    
+                    case 'script_error':
+                        this.addTerminalLog(`执行错误: ${data.script} - ${data.error}`, 'stderr');
+                        this.setButtonLoading(data.script, false);
+                        this.currentExecutions.delete(data.script);
+                        this.showAlert('error', `${data.script} 执行错误: ${data.error}`);
+                        break;
+                }
+            }
+
+            async loadServiceStatus() {
+                try {
+                    const response = await fetch(`${this.apiBase}/api/status`);
+                    const status = await response.json();
+                    
+                    if (response.ok) {
+                        this.updateStatusDisplay(status);
+                    } else {
+                        throw new Error(status.error || '获取状态失败');
+                    }
+                } catch (error) {
+                    console.error('获取服务状态失败:', error);
+                    this.showAlert('error', `获取状态失败: ${error.message}`);
+                }
+            }
+
+            updateStatusDisplay(status) {
+                const runStatus = document.getElementById('runStatus');
+                const installStatus = document.getElementById('installStatus');
+                const currentVersion = document.getElementById('currentVersion');
+                const httpStatus = document.getElementById('httpStatus');
+
+                // 更新运行状态
+                runStatus.textContent = this.getStatusText(status.status || 'unknown');
+                runStatus.className = `status-value ${status.status || 'unknown'}`;
+
+                // 更新安装状态
+                installStatus.textContent = status.install ? '已安装' : '未安装';
+                installStatus.className = `status-value ${status.install ? 'running' : 'stopped'}`;
+
+                // 更新版本信息
+                currentVersion.textContent = status.version || 'unknown';
+
+                // 更新HTTP状态
+                const httpText = status.http_status === 'online' ? `端口${status.port}可用` : '不可用';
+                httpStatus.textContent = httpText;
+                httpStatus.className = `status-value ${status.http_status === 'online' ? 'running' : 'stopped'}`;
+            }
+
+            getStatusText(status) {
+                const statusMap = {
+                    'running': '运行中',
+                    'stopped': '已停止',
+                    'starting': '启动中',
+                    'stopping': '停止中',
+                    'failed': '失败',
+                    'unknown': '未知'
+                };
+                return statusMap[status] || status;
+            }
+
+            async executeScript(scriptName, params = {}) {
+                if (this.currentExecutions.has(scriptName)) {
+                    this.showAlert('warning', `${scriptName} 正在执行中，请稍候...`);
+                    return;
+                }
+
+                this.currentExecutions.add(scriptName);
+                this.addTerminalLog(`请求执行: ${scriptName}`, 'info');
+
+                try {
+                    const response = await fetch(`${this.apiBase}/api/execute/${scriptName}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ params })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(result.error || '执行失败');
+                    }
+
+                } catch (error) {
+                    console.error(`执行${scriptName}失败:`, error);
+                    this.addTerminalLog(`执行${scriptName}失败: ${error.message}`, 'stderr');
+                    this.showAlert('error', `执行失败: ${error.message}`);
+                    this.currentExecutions.delete(scriptName);
+                    this.setButtonLoading(scriptName, false);
+                }
+            }
+
+            setButtonLoading(scriptName, isLoading) {
+                const buttonMap = {
+                    'autocheck': '状态检查',
+                    'start': '启动服务',
+                    'stop': '停止服务',
+                    'backup': '创建备份',
+                    'install': '安装服务',
+                    'update': '更新服务',
+                    'restore': '还原配置',
+                    'uninstall': '卸载服务'
+                };
+
+                const buttons = document.querySelectorAll('.btn');
+                buttons.forEach(btn => {
+                    if (btn.textContent.trim() === buttonMap[scriptName]) {
+                        btn.disabled = isLoading;
+                        if (isLoading) {
+                            btn.classList.add('loading');
+                        } else {
+                            btn.classList.remove('loading');
+                        }
+                    }
+                });
+            }
+
+            addTerminalLog(message, type = 'stdout', addTimestamp = true) {
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${type}`;
+                
+                let content = '';
+                if (addTimestamp) {
+                    const timestamp = new Date().toLocaleTimeString();
+                    content += `<span class="log-timestamp">[${timestamp}]</span>`;
+                }
+                content += message;
+                
+                entry.innerHTML = content;
+                this.terminal.appendChild(entry);
+                this.terminal.scrollTop = this.terminal.scrollHeight;
+            }
+
+            showAlert(type, message) {
+                const alertsContainer = document.getElementById('alerts');
+                const alert = document.createElement('div');
+                alert.className = `alert ${type}`;
+                alert.textContent = message;
+                
+                alertsContainer.appendChild(alert);
+                
+                // 3秒后自动移除
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.parentNode.removeChild(alert);
+                    }
+                }, 3000);
+            }
+
+            clearTerminal() {
+                this.terminal.innerHTML = '';
+                this.addTerminalLog('终端已清空', 'info');
+            }
+        }
+
+        // 全局实例
+        let serviceManager;
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            serviceManager = new HAServiceManager();
+        });
+
+        // 全局函数
+        function executeScript(scriptName) {
+            serviceManager.executeScript(scriptName);
+        }
+
+        function toggleAdvanced() {
+            const controls = document.getElementById('advancedControls');
+            const button = document.querySelector('.toggle-advanced');
+            
+            if (controls.classList.contains('show')) {
+                controls.classList.remove('show');
+                button.textContent = '显示高级选项';
+            } else {
+                controls.classList.add('show');
+                button.textContent = '隐藏高级选项';
+            }
+        }
+
+        function clearTerminal() {
+            serviceManager.clearTerminal();
+        }
+
+        function showInstallDialog() {
+            const version = prompt('请输入要安装的Home Assistant版本 (留空使用默认版本):');
+            if (version !== null) {
+                const params = version.trim() ? { env: { TARGET_VERSION: version.trim() } } : {};
+                serviceManager.executeScript('install', params);
+            }
+        }
+
+        function showUpdateDialog() {
+            const version = prompt('请输入要更新到的Home Assistant版本 (留空使用最新版本):');
+            if (version !== null) {
+                const params = version.trim() ? { env: { TARGET_VERSION: version.trim() } } : {};
+                serviceManager.executeScript('update', params);
+            }
+        }
+
+        function showRestoreDialog() {
+            const choice = confirm('选择还原方式:\n确定 - 使用备份文件还原\n取消 - 生成默认配置');
+            
+            if (choice) {
+                const file = prompt('请输入备份文件路径 (留空使用最新备份):');
+                const params = file ? { env: { RESTORE_FILE: file } } : {};
+                serviceManager.executeScript('restore', params);
+            } else {
+                const params = { config: true };
+                serviceManager.executeScript('restore', params);
+            }
+        }
+    </script>
+</body>
+</html>
