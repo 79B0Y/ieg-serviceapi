@@ -1,10 +1,3 @@
-// 启动服务器
-server.listen(CONFIG.PORT, () => {
-    console.log(`多服务管理API已启动`);
-    console.log(`HTTP服务器: http://localhost:${CONFIG.PORT}`);
-    console.log(`WebSocket服务器: ws://localhost:${CONFIG.PORT}`);
-    console.log(`基础服务目录: ${CONFIG.BASE_SERVICE_DIR}`);
-    
 // 加载服务信息
 const express = require('express');
 const WebSocket = require('ws');
