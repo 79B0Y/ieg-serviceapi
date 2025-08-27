@@ -5,8 +5,8 @@ server.listen(CONFIG.PORT, () => {
     console.log(`WebSocket服务器: ws://localhost:${CONFIG.PORT}`);
     console.log(`基础服务目录: ${CONFIG.BASE_SERVICE_DIR}`);
     
-    // 加载服务信息
-    constconst express = require('express');
+// 加载服务信息
+const express = require('express');
 const WebSocket = require('ws');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -20,9 +20,10 @@ const wss = new WebSocket.Server({ server });
 
 // 配置
 const CONFIG = {
-    PORT: process.env.PORT || 3000,
+    PORT: process.env.PORT || 3008,
     BASE_SERVICE_DIR: '/data/data/com.termux/files/home/servicemanager',
     SERVICE_UPDATE_FILE: '/data/data/com.termux/files/home/servicemanager/serviceupdate.json',
+    API_PREFIX: '/ieg-serviceapi',
     SCRIPTS: {
         autocheck: 'autocheck.sh',
         backup: 'backup.sh',
@@ -49,15 +50,14 @@ function loadServicesInfo() {
             if (serviceData.services && Array.isArray(serviceData.services)) {
                 serviceData.services.forEach(service => {
                     if (service.id && service.enabled !== false) {
-                        servicesInfo[service.id] = {
-                            ...service,
+                        servicesInfo[service.id] = Object.assign({}, service, {
                             service_dir: path.join(CONFIG.BASE_SERVICE_DIR, service.id)
-                        };
+                        });
                     }
                 });
             }
             
-            console.log(`已加载 ${Object.keys(servicesInfo).length} 个服务:`, Object.keys(servicesInfo).join(', '));
+            console.log('已加载 ' + Object.keys(servicesInfo).length + ' 个服务:', Object.keys(servicesInfo).join(', '));
             return true;
         } else {
             console.warn('serviceupdate.json 文件不存在');
@@ -95,7 +95,6 @@ wss.on('connection', (ws, request) => {
         clients.delete(ws);
     });
     
-    // 发送连接确认
     ws.send(JSON.stringify({
         type: 'connection',
         status: 'connected',
@@ -118,7 +117,7 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
     return new Promise((resolve, reject) => {
         // 检查服务是否存在
         if (!servicesInfo[serviceId]) {
-            reject(new Error(`服务不存在: ${serviceId}`));
+            reject(new Error('服务不存在: ' + serviceId));
             return;
         }
         
@@ -127,7 +126,7 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
         
         // 检查脚本是否存在
         if (!fs.existsSync(scriptPath)) {
-            reject(new Error(`脚本不存在: ${scriptPath}`));
+            reject(new Error('脚本不存在: ' + scriptPath));
             return;
         }
         
@@ -139,12 +138,9 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
         if (params.json) args.push('--json');
         
         // 设置环境变量
-        const env = {
-            ...process.env,
-            ...params.env || {}
-        };
+        const env = Object.assign({}, process.env, params.env || {});
         
-        console.log(`执行脚本: ${serviceId}/${scriptName} - ${scriptPath} ${args.join(' ')}`);
+        console.log('执行脚本: ' + serviceId + '/' + scriptName + ' - ' + scriptPath + ' ' + args.join(' '));
         
         // 广播开始执行
         broadcast({
@@ -155,7 +151,7 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
             params: params
         });
         
-        const child = spawn('bash', [scriptPath, ...args], {
+        const child = spawn('bash', [scriptPath].concat(args), {
             cwd: serviceDir,
             env: env,
             stdio: ['pipe', 'pipe', 'pipe']
@@ -217,10 +213,17 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
             // 广播执行结果
             broadcast({
                 type: 'script_complete',
-                ...result
+                service: serviceId,
+                script: scriptName,
+                exitCode: code,
+                success: code === 0,
+                stdout: stdout,
+                stderr: stderr,
+                output: output,
+                timestamp: new Date().toISOString()
             });
             
-            console.log(`脚本 ${serviceId}/${scriptName} 执行完成，退出码: ${code}`);
+            console.log('脚本 ' + serviceId + '/' + scriptName + ' 执行完成，退出码: ' + code);
             
             if (code === 0) {
                 resolve(result);
@@ -241,10 +244,14 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
             
             broadcast({
                 type: 'script_error',
-                ...errorResult
+                service: serviceId,
+                script: scriptName,
+                error: error.message,
+                success: false,
+                timestamp: new Date().toISOString()
             });
             
-            console.error(`脚本 ${serviceId}/${scriptName} 执行错误:`, error);
+            console.error('脚本 ' + serviceId + '/' + scriptName + ' 执行错误:', error);
             reject(errorResult);
         });
         
@@ -264,19 +271,19 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
     });
 }
 
-// API路由
-app.get('/api/health', (req, res) => {
+// API路由 - 使用统一前缀
+app.get(CONFIG.API_PREFIX + '/health', (req, res) => {
     res.json({
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        service: 'Multi-Service Manager API',
+        service: 'IEG Service Manager API',
         version: '1.0.0',
         loaded_services: Object.keys(servicesInfo).length
     });
 });
 
 // 获取所有服务列表
-app.get('/api/services', (req, res) => {
+app.get(CONFIG.API_PREFIX + '/services', (req, res) => {
     const services = Object.keys(servicesInfo).map(id => {
         const service = servicesInfo[id];
         return {
@@ -286,8 +293,7 @@ app.get('/api/services', (req, res) => {
             latest_service_version: service.latest_service_version,
             enabled: service.enabled !== false,
             notes: service.notes || '',
-            service_dir: service.service_dir,
-            scripts_exist: checkServiceScripts(id)
+            service_dir: service.service_dir
         };
     });
     
@@ -299,8 +305,8 @@ app.get('/api/services', (req, res) => {
 });
 
 // 获取特定服务信息
-app.get('/api/services/:serviceId', (req, res) => {
-    const { serviceId } = req.params;
+app.get(CONFIG.API_PREFIX + '/services/:serviceId', (req, res) => {
+    const serviceId = req.params.serviceId;
     
     if (!servicesInfo[serviceId]) {
         return res.status(404).json({
@@ -311,38 +317,61 @@ app.get('/api/services/:serviceId', (req, res) => {
     }
     
     const service = servicesInfo[serviceId];
-    const scripts = checkServiceScripts(serviceId);
     
-    res.json({
-        ...service,
-        scripts_available: scripts,
+    res.json(Object.assign({}, service, {
         timestamp: new Date().toISOString()
-    });
+    }));
 });
 
-// 检查服务脚本是否存在
-function checkServiceScripts(serviceId) {
-    if (!servicesInfo[serviceId]) return {};
+// 获取特定服务状态
+app.get(CONFIG.API_PREFIX + '/services/:serviceId/status', async (req, res) => {
+    const serviceId = req.params.serviceId;
     
-    const serviceDir = servicesInfo[serviceId].service_dir;
-    const scripts = {};
+    if (!servicesInfo[serviceId]) {
+        return res.status(404).json({
+            error: '服务不存在',
+            service_id: serviceId,
+            available_services: Object.keys(servicesInfo)
+        });
+    }
     
-    Object.keys(CONFIG.SCRIPTS).forEach(scriptName => {
-        const scriptPath = path.join(serviceDir, CONFIG.SCRIPTS[scriptName]);
-        scripts[scriptName] = {
-            filename: CONFIG.SCRIPTS[scriptName],
-            path: scriptPath,
-            exists: fs.existsSync(scriptPath)
-        };
-    });
-    
-    return scripts;
-}
+    try {
+        const result = await executeServiceScript(serviceId, 'autocheck', { json: true });
+        if (result.success && result.stdout) {
+            try {
+                const status = JSON.parse(result.stdout.trim());
+                res.json(status);
+            } catch (parseError) {
+                res.json({ 
+                    service: serviceId,
+                    status: result.stdout.trim(),
+                    timestamp: new Date().toISOString()
+                });
+            }
+        } else {
+            res.json({
+                service: serviceId,
+                status: 'unknown',
+                error: 'Failed to get status',
+                timestamp: new Date().toISOString()
+            });
+        }
+    } catch (error) {
+        res.json({
+            service: serviceId,
+            status: 'error',
+            error: error.message || error.error || 'Unknown error',
+            timestamp: new Date().toISOString()
+        });
+    }
+});
 
 // 通用服务脚本执行接口
-app.post('/api/services/:serviceId/execute/:scriptName', async (req, res) => {
-    const { serviceId, scriptName } = req.params;
-    const { params = {}, timeout } = req.body;
+app.post(CONFIG.API_PREFIX + '/services/:serviceId/execute/:scriptName', async (req, res) => {
+    const serviceId = req.params.serviceId;
+    const scriptName = req.params.scriptName;
+    const params = req.body.params || {};
+    const timeout = req.body.timeout;
     
     if (!servicesInfo[serviceId]) {
         return res.status(404).json({
@@ -361,7 +390,7 @@ app.post('/api/services/:serviceId/execute/:scriptName', async (req, res) => {
     }
     
     try {
-        const result = await executeServiceScript(serviceId, scriptName, params, { timeout });
+        const result = await executeServiceScript(serviceId, scriptName, params, { timeout: timeout });
         res.json(result);
     } catch (error) {
         res.status(500).json(error);
@@ -369,9 +398,11 @@ app.post('/api/services/:serviceId/execute/:scriptName', async (req, res) => {
 });
 
 // 批量服务操作
-app.post('/api/services/batch/:scriptName', async (req, res) => {
-    const { scriptName } = req.params;
-    const { services, params = {}, timeout } = req.body;
+app.post(CONFIG.API_PREFIX + '/services/batch/:scriptName', async (req, res) => {
+    const scriptName = req.params.scriptName;
+    const services = req.body.services || [];
+    const params = req.body.params || {};
+    const timeout = req.body.timeout;
     
     if (!CONFIG.SCRIPTS[scriptName]) {
         return res.status(400).json({
@@ -381,7 +412,7 @@ app.post('/api/services/batch/:scriptName', async (req, res) => {
         });
     }
     
-    if (!services || !Array.isArray(services)) {
+    if (!Array.isArray(services)) {
         return res.status(400).json({
             error: '请提供服务ID数组',
             example: { services: ['hass', 'zigbee2mqtt'] }
@@ -402,13 +433,10 @@ app.post('/api/services/batch/:scriptName', async (req, res) => {
         }
         
         try {
-            const result = await executeServiceScript(serviceId, scriptName, params, { timeout });
+            const result = await executeServiceScript(serviceId, scriptName, params, { timeout: timeout });
             results.push(result);
         } catch (error) {
-            errors.push({
-                service: serviceId,
-                ...error
-            });
+            errors.push(Object.assign({ service: serviceId }, error));
         }
     });
     
@@ -425,229 +453,8 @@ app.post('/api/services/batch/:scriptName', async (req, res) => {
     });
 });
 
-// 获取服务状态 (支持多服务)
-app.get('/api/services/:serviceId/status', async (req, res) => {
-    const { serviceId } = req.params;
-    
-    if (!servicesInfo[serviceId]) {
-        return res.status(404).json({
-            error: '服务不存在',
-            service_id: serviceId
-        });
-    }
-    
-    try {
-        const result = await executeServiceScript(serviceId, 'status', { json: true });
-        if (result.success && result.stdout) {
-            try {
-                const status = JSON.parse(result.stdout.trim());
-                res.json(status);
-            } catch (parseError) {
-                res.json({ 
-                    service: serviceId,
-                    status: result.stdout.trim(),
-                    timestamp: new Date().toISOString()
-                });
-            }
-        } else {
-            res.status(500).json(result);
-        }
-    } catch (error) {
-        res.status(500).json(error);
-    }
-});
-
-// 获取所有服务状态
-app.get('/api/services/status/all', async (req, res) => {
-    const serviceIds = Object.keys(servicesInfo);
-    const statuses = {};
-    const errors = {};
-    
-    // 并行获取所有服务状态
-    const promises = serviceIds.map(async (serviceId) => {
-        try {
-            const result = await executeServiceScript(serviceId, 'status', { json: true, quiet: true });
-            if (result.success && result.stdout) {
-                try {
-                    statuses[serviceId] = JSON.parse(result.stdout.trim());
-                } catch (parseError) {
-                    statuses[serviceId] = {
-                        service: serviceId,
-                        status: result.stdout.trim(),
-                        parse_error: true
-                    };
-                }
-            } else {
-                statuses[serviceId] = {
-                    service: serviceId,
-                    status: 'unknown',
-                    error: 'Failed to get status'
-                };
-            }
-        } catch (error) {
-            errors[serviceId] = error.message || 'Unknown error';
-            statuses[serviceId] = {
-                service: serviceId,
-                status: 'error',
-                error: error.message
-            };
-        }
-    });
-    
-    await Promise.allSettled(promises);
-    
-    res.json({
-        services: statuses,
-        errors: errors,
-        total: serviceIds.length,
-        timestamp: new Date().toISOString()
-    });
-});
-
-// 兼容性接口 - 保持向后兼容
-app.post('/api/execute/:scriptName', async (req, res) => {
-    const { scriptName } = req.params;
-    const { params = {}, timeout } = req.body;
-    
-    // 默认使用 hass 服务以保持兼容性
-    const serviceId = 'hass';
-    
-    if (!servicesInfo[serviceId]) {
-        return res.status(404).json({
-            error: 'Home Assistant服务未配置',
-            message: '请使用新的多服务API: /api/services/{serviceId}/execute/{scriptName}'
-        });
-    }
-    
-    if (!CONFIG.SCRIPTS[scriptName]) {
-        return res.status(400).json({
-            error: '无效的脚本名称',
-            available_scripts: Object.keys(CONFIG.SCRIPTS)
-        });
-    }
-    
-    try {
-        const result = await executeServiceScript(serviceId, scriptName, params, { timeout });
-        res.json(result);
-    } catch (error) {
-        res.status(500).json(error);
-    }
-});
-
-// 兼容性专用脚本接口
-app.post('/api/autocheck', async (req, res) => {
-    try {
-        const result = await executeServiceScript('hass', 'autocheck');
-        res.json(result);
-    } catch (error) {
-        res.status(500).json(error);
-    }
-});
-
-app.post('/api/backup', async (req, res) => {
-    try {
-        const result = await executeServiceScript('hass', 'backup');
-        res.json(result);
-    } catch (error) {
-        res.status(500).json(error);
-    }
-});
-
-app.post('/api/install', async (req, res) => {
-    const { version } = req.body;
-    const env = version ? { TARGET_VERSION: version } : {};
-    
-    try {
-        const result = await executeServiceScript('hass', 'install', { env }, { timeout: 1800000 });
-        res.json(result);
-    } catch (error) {
-        res.status(500).json(error);
-    }
-});
-
-app.post('/api/restore', async (req, res) => {
-    const { file, config } = req.body;
-    const params = {};
-    
-    if (file) {
-        params.env = { RESTORE_FILE: file };
-    }
-    if (config) {
-        params.config = true;
-    }
-    
-    try {
-        const result = await executeServiceScript('hass', 'restore', params);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json(error);
-    }
-});
-
-app.post('/api/start', async (req, res) => {
-    try {
-        const result = await executeServiceScript('hass', 'start');
-        res.json(result);
-    } catch (error) {
-        res.status(500).json(error);
-    }
-});
-
-app.post('/api/stop', async (req, res) => {
-    try {
-        const result = await executeServiceScript('hass', 'stop');
-        res.json(result);
-    } catch (error) {
-        res.status(500).json(error);
-    }
-});
-
-app.post('/api/uninstall', async (req, res) => {
-    try {
-        const result = await executeServiceScript('hass', 'uninstall');
-        res.json(result);
-    } catch (error) {
-        res.status(500).json(error);
-    }
-});
-
-app.post('/api/update', async (req, res) => {
-    const { version } = req.body;
-    const env = version ? { TARGET_VERSION: version } : {};
-    
-    try {
-        const result = await executeServiceScript('hass', 'update', { env }, { timeout: 1800000 });
-        res.json(result);
-    } catch (error) {
-        res.status(500).json(error);
-    }
-});
-
-// 兼容性状态接口
-app.get('/api/status', async (req, res) => {
-    try {
-        const result = await executeServiceScript('hass', 'status', { json: true });
-        if (result.success && result.stdout) {
-            try {
-                const status = JSON.parse(result.stdout.trim());
-                res.json(status);
-            } catch (parseError) {
-                res.json({ 
-                    service: 'hass',
-                    status: result.stdout.trim(),
-                    timestamp: new Date().toISOString()
-                });
-            }
-        } else {
-            res.status(500).json(result);
-        }
-    } catch (error) {
-        res.status(500).json(error);
-    }
-});
-
 // 重新加载服务配置
-app.post('/api/services/reload', (req, res) => {
+app.post(CONFIG.API_PREFIX + '/services/reload', (req, res) => {
     const success = loadServicesInfo();
     
     res.json({
@@ -659,11 +466,41 @@ app.post('/api/services/reload', (req, res) => {
 });
 
 // WebSocket状态接口
-app.get('/api/websocket/clients', (req, res) => {
+app.get(CONFIG.API_PREFIX + '/websocket/clients', (req, res) => {
     res.json({
         connected_clients: clients.size,
         timestamp: new Date().toISOString()
     });
+});
+
+// 兼容性接口 - 保持一些基本的向后兼容
+app.post(CONFIG.API_PREFIX + '/execute/:scriptName', async (req, res) => {
+    const scriptName = req.params.scriptName;
+    const params = req.body.params || {};
+    const timeout = req.body.timeout;
+    
+    const serviceId = 'hass';
+    
+    if (!servicesInfo[serviceId]) {
+        return res.status(404).json({
+            error: 'Home Assistant服务未配置',
+            message: '请使用新的多服务API: ' + CONFIG.API_PREFIX + '/services/{serviceId}/execute/{scriptName}'
+        });
+    }
+    
+    if (!CONFIG.SCRIPTS[scriptName]) {
+        return res.status(400).json({
+            error: '无效的脚本名称',
+            available_scripts: Object.keys(CONFIG.SCRIPTS)
+        });
+    }
+    
+    try {
+        const result = await executeServiceScript(serviceId, scriptName, params, { timeout: timeout });
+        res.json(result);
+    } catch (error) {
+        res.status(500).json(error);
+    }
 });
 
 // 错误处理中间件
@@ -688,18 +525,19 @@ app.use((req, res) => {
 
 // 启动服务器
 server.listen(CONFIG.PORT, () => {
-    console.log(`多服务管理API已启动`);
-    console.log(`HTTP服务器: http://localhost:${CONFIG.PORT}`);
-    console.log(`WebSocket服务器: ws://localhost:${CONFIG.PORT}`);
-    console.log(`基础服务目录: ${CONFIG.BASE_SERVICE_DIR}`);
+    console.log('IEG服务管理API已启动');
+    console.log('HTTP服务器: http://localhost:' + CONFIG.PORT);
+    console.log('WebSocket服务器: ws://localhost:' + CONFIG.PORT);
+    console.log('API前缀: ' + CONFIG.API_PREFIX);
+    console.log('基础服务目录: ' + CONFIG.BASE_SERVICE_DIR);
     
     // 加载服务信息
     const success = loadServicesInfo();
     if (success) {
-        console.log(`✓ 服务配置加载成功`);
-        console.log(`✓ 可用服务: ${Object.keys(servicesInfo).join(', ')}`);
+        console.log('✓ 服务配置加载成功');
+        console.log('✓ 可用服务: ' + Object.keys(servicesInfo).join(', '));
     } else {
-        console.warn(`⚠ 服务配置加载失败，将以兼容模式运行`);
+        console.warn('⚠ 服务配置加载失败，将以兼容模式运行');
     }
 });
 
