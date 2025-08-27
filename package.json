@@ -1,7 +1,7 @@
 {
-  "name": "homeassistant-service-manager",
+  "name": "ieg-serviceapi",
   "version": "1.0.0",
-  "description": "Home Assistant服务管理API和Web界面",
+  "description": "IEG服务管理API和Web界面",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -12,14 +12,14 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
-    "homeassistant",
+    "ieg",
     "service",
     "management",
     "api",
     "websocket",
     "termux"
   ],
-  "author": "Home Assistant Service Manager",
+  "author": "IEG Service Manager",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
@@ -34,10 +34,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/homeassistant-service-manager.git"
+    "url": "https://github.com/your-username/ieg-serviceapi.git"
   },
   "bugs": {
-    "url": "https://github.com/your-username/homeassistant-service-manager/issues"
+    "url": "https://github.com/your-username/ieg-serviceapi/issues"
   },
-  "homepage": "https://github.com/your-username/homeassistant-service-manager#readme"
+  "homepage": "https://github.com/your-username/ieg-serviceapi#readme"
 }
