@@ -927,32 +927,33 @@ server.listen(CONFIG.PORT, () => {
     console.log('='.repeat(60));
 });
 
-// 优雅关闭处理
+// 优雅关闭处理 - 修复版本
 function gracefulShutdown(signal) {
-    console.log(`\n[SHUTDOWN] 收到${signal}信号，正在优雅关闭...`);
+    console.log(`\n[SHUTDOWN] 收到${signal}信号，正在关闭...`);
     
-    // 停止接受新的连接
+    // 立即停止接受新连接
     server.close(() => {
         console.log('[SHUTDOWN] HTTP服务器已关闭');
-        
-        // 关闭所有WebSocket连接
-        clients.forEach(client => {
-            client.close(1000, 'Server shutdown');
-        });
-        console.log('[SHUTDOWN] WebSocket连接已关闭');
-        
-        // 等待正在执行的脚本完成或强制终止
-        if (executionTracker.size > 0) {
-            console.log(`[SHUTDOWN] 等待 ${executionTracker.size} 个正在执行的脚本完成...`);
-            
-            setTimeout(() => {
-                console.log('[SHUTDOWN] 强制退出');
-                process.exit(0);
-            }, 10000); // 10秒后强制退出
-        } else {
-            process.exit(0);
-        }
     });
+    
+    // 关闭所有WebSocket连接
+    clients.forEach(client => {
+        try {
+            client.close(1000, 'Server shutdown');
+        } catch (e) {}
+    });
+    
+    // 清理所有执行锁
+    executionTracker.clear();
+    lastExecution.clear();
+    broadcastThrottle.clear();
+    
+    console.log('[SHUTDOWN] 清理完成，退出进程');
+    
+    // 强制退出，不等待
+    setTimeout(() => {
+        process.exit(0);
+    }, 1000);
 }
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
