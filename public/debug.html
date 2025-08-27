@@ -3,195 +3,424 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>多服务管理 API 调试台（增强版）</title>
+  <title>IEG 服务管理 API 调试控制台</title>
   <style>
-    :root{--bg:#1e1e1e;--panel:#252526;--panel2:#2d2d30;--border:#3c3c3c;--text:#d4d4d4;--blue:#4fc3f7;--green:#4caf50;--red:#f44336}
+    :root{--bg:#1e1e1e;--panel:#252526;--panel2:#2d2d30;--border:#3c3c3c;--text:#d4d4d4;--blue:#4fc3f7;--green:#4caf50;--red:#f44336;--purple:#b388ff;--orange:#ffb74d;}
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--bg);color:var(--text)}
-    .container{max-width:1450px;margin:0 auto;padding:18px}
-    .header{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
-    .header h1{color:var(--blue);font-size:18px}
-    .status{padding:6px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px}
-    .ok{background:#1a3327;color:#9be7c4} .bad{background:#3a2222;color:#ffcdd2}
-    .grid{display:grid;grid-template-columns:520px 1fr;gap:16px}
-    .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
-    .panel h2{font-size:14px;color:#9cdcfe;background:var(--panel2);padding:10px 12px;border-bottom:1px solid var(--border)}
-    .body{padding:12px}
-    .row{display:grid;grid-template-columns:110px 1fr;gap:10px;margin-bottom:10px}
-    label{color:#9cdcfe;font-size:12px;line-height:28px}
-    input,select,textarea{width:100%;background:#0d1117;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:12px}
-    textarea{min-height:110px;resize:vertical}
-    .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-    .btn{background:#0e639c;border:none;border-radius:8px;color:#fff;padding:9px 12px;font-size:12px;cursor:pointer}
-    .btn:hover{background:#1177bb}
+    body{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--bg);color:var(--text);line-height:1.4}
+    .container{max-width:1600px;margin:0 auto;padding:20px}
+    .header{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px}
+    .header h1{color:var(--blue);font-size:20px;margin:0}
+    .header-info{display:flex;align-items:center;gap:15px;font-size:14px}
+    .status{padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:12px;font-weight:500}
+    .ok{background:#1a3327;color:#9be7c4;border-color:#2d5a3d} 
+    .bad{background:#3a2222;color:#ffcdd2;border-color:#5d3333}
+    .grid{display:grid;grid-template-columns:580px 1fr;gap:20px}
+    .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+    .panel h2{font-size:15px;color:#9cdcfe;background:var(--panel2);padding:12px 16px;border-bottom:1px solid var(--border);margin:0}
+    .body{padding:16px;flex:1}
+    .row{display:grid;grid-template-columns:120px 1fr;gap:12px;margin-bottom:12px;align-items:start}
+    label{color:#9cdcfe;font-size:13px;line-height:34px;font-weight:500}
+    input,select,textarea{width:100%;background:#0d1117;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px rgba(79,195,247,0.2)}
+    textarea{min-height:120px;resize:vertical;font-family:ui-monospace,monospace}
+    .btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+    .btn{background:#0e639c;border:none;border-radius:8px;color:#fff;padding:10px 16px;font-size:13px;cursor:pointer;font-weight:500;transition:all 0.2s}
+    .btn:hover{background:#1177bb;transform:translateY(-1px)}
     .btn.secondary{background:#424242}.btn.secondary:hover{background:#616161}
     .btn.success{background:#2e7d32}.btn.success:hover{background:#39863d}
-    .logs-toolbar{display:flex;gap:8px;align-items:center;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--border)}
-    .logs{flex:1;overflow:auto;padding:10px}
-    .entry{border-left:3px solid var(--blue);background:#0b0f14;border:1px solid #22303f;margin:0 0 10px;border-radius:8px;padding:8px}
-    .res{border-left-color:var(--green)} .err{border-left-color:var(--red)} .ws{border-left-color:#b388ff}
-    .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:#9aa7b0;margin-bottom:6px}
-    .kv{display:grid;grid-template-columns:110px 1fr;gap:6px;font-size:12px;margin:6px 0}
-    details{background:#0d1117;border:1px solid #233043;border-radius:6px;margin-top:6px}
-    summary{cursor:pointer;padding:6px 10px;color:#a5d6ff}
-    pre{margin:0;padding:10px 12px;white-space:pre-wrap;word-break:break-word;font-size:12px}
-    @media (max-width:1100px){.grid{grid-template-columns:1fr}}
+    .btn.danger{background:#c62828}.btn.danger:hover{background:#d32f2f}
+    .logs-toolbar{display:flex;gap:12px;align-items:center;padding:10px 16px;background:var(--panel2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .logs{flex:1;overflow:auto;padding:12px 16px;max-height:600px}
+    .entry{border-left:4px solid var(--blue);background:#0b0f14;border:1px solid #22303f;margin:0 0 12px;border-radius:10px;padding:12px;transition:all 0.2s}
+    .entry:hover{background:#0f1419;border-color:#2a3441}
+    .res{border-left-color:var(--green)} .err{border-left-color:var(--red)} .ws{border-left-color:var(--purple)}
+    .meta{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:#9aa7b0;margin-bottom:8px;align-items:center}
+    .meta .tag{background:#1a1a1a;padding:3px 8px;border-radius:4px;border:1px solid #333}
+    .kv{display:grid;grid-template-columns:130px 1fr;gap:8px;font-size:13px;margin:8px 0;align-items:start}
+    .kv-key{color:#64b5f6;font-weight:500}
+    details{background:#0d1117;border:1px solid #233043;border-radius:8px;margin-top:8px}
+    summary{cursor:pointer;padding:8px 12px;color:#a5d6ff;font-weight:500;user-select:none}
+    summary:hover{background:#1a1a1a}
+    pre{margin:0;padding:12px 16px;white-space:pre-wrap;word-break:break-word;font-size:12px;background:#000;border-radius:0 0 8px 8px}
+    .quick-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:12px}
+    .services-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:12px 0}
+    .service-card{background:#1a1a1a;border:1px solid var(--border);border-radius:8px;padding:12px}
+    .service-card h4{color:var(--blue);margin-bottom:8px;font-size:14px}
+    .service-card .service-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+    .service-card .btn{font-size:11px;padding:6px 10px}
+    @media (max-width:1200px){.grid{grid-template-columns:1fr}.logs{max-height:400px}}
   </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <h1>多服务管理 API 调试台</h1>
-    <div id="wsState" class="status bad">WS 未连接</div>
+    <h1>IEG 服务管理 API 调试控制台</h1>
+    <div class="header-info">
+      <div id="wsState" class="status bad">WebSocket 断开</div>
+      <div id="serviceCount" class="status ok">服务: 0</div>
+    </div>
   </div>
 
   <div class="grid">
     <!-- 左：请求构建器 -->
     <div class="panel">
-      <h2>请求构建器</h2>
+      <h2>API 请求构建器</h2>
       <div class="body">
         <div class="row">
-          <label>API 基址</label>
+          <label>API 基地址</label>
           <input id="apiBase" />
         </div>
         <div class="row">
-          <label>方法</label>
-          <select id="method"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>
+          <label>HTTP 方法</label>
+          <select id="method">
+            <option>GET</option>
+            <option>POST</option>
+            <option>PUT</option>
+            <option>DELETE</option>
+          </select>
         </div>
         <div class="row">
-          <label>端点</label>
-          <input id="endpoint" placeholder="/services 或 /services/hass/status" />
+          <label>API 端点</label>
+          <select id="endpoint">
+            <option value="/health">GET /health - 健康检查</option>
+            <option value="/services">GET /services - 获取服务列表</option>
+            <option value="/services/reload">POST /services/reload - 重新加载服务</option>
+            <option value="/services/hass/status">GET /services/{id}/status - 服务状态</option>
+            <option value="/services/hass/execute/autocheck">POST /services/{id}/execute/{script} - 执行脚本</option>
+            <option value="/services/batch/start">POST /services/batch/{script} - 批量操作</option>
+            <option value="/statuscheck/all">POST /statuscheck/all - 全局状态检查</option>
+            <option value="/websocket/clients">GET /websocket/clients - WebSocket状态</option>
+            <option value="custom">自定义端点...</option>
+          </select>
+        </div>
+        <div class="row" id="customEndpointRow" style="display:none">
+          <label>自定义端点</label>
+          <input id="customEndpoint" placeholder="/custom/endpoint" />
         </div>
         <div class="row">
-          <label>Headers (JSON)</label>
+          <label>请求头 (JSON)</label>
           <textarea id="headers" spellcheck="false" placeholder='{"Content-Type":"application/json"}'></textarea>
         </div>
         <div class="row">
-          <label>Body (JSON)</label>
+          <label>请求体 (JSON)</label>
           <textarea id="body" spellcheck="false" placeholder='{"timeout":30000,"params":{"json":true}}'></textarea>
         </div>
+        
         <div class="btns">
           <button class="btn success" id="sendBtn">发送请求</button>
           <button class="btn secondary" id="clearBtn">清空日志</button>
           <button class="btn secondary" id="exportBtn">导出日志</button>
+          <button class="btn" id="loadServicesBtn">刷新服务列表</button>
         </div>
-        <div style="margin-top:10px;font-size:12px;color:#aaa">
-          说明：默认基址为 <b>当前页面 origin + /ieg-serviceapi</b>（即 3008 端口下的新前缀）。
+
+        <div class="quick-actions">
+          <button class="btn secondary" onclick="quickRequest('/health', 'GET')">健康检查</button>
+          <button class="btn secondary" onclick="quickRequest('/services', 'GET')">服务列表</button>
+          <button class="btn secondary" onclick="quickRequest('/services/reload', 'POST')">重载配置</button>
         </div>
       </div>
     </div>
 
-    <!-- 右：日志面板 -->
-    <div class="panel" style="min-height:540px">
+    <!-- 右：响应日志面板 -->
+    <div class="panel" style="min-height:700px">
       <div class="logs-toolbar">
-        <input id="search" placeholder="搜索（URL/状态码/内容）" style="flex:1;padding:6px 10px" />
-        <label style="font-size:12px"><input type="checkbox" id="autoScroll" checked> 自动滚动</label>
-        <label style="font-size:12px"><input type="checkbox" id="pretty" checked> JSON美化</label>
+        <input id="search" placeholder="搜索日志内容..." style="flex:1;padding:8px 12px" />
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px">
+          <input type="checkbox" id="autoScroll" checked> 自动滚动
+        </label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px">
+          <input type="checkbox" id="pretty" checked> JSON美化
+        </label>
+        <button class="btn secondary" onclick="toggleServices()">服务面板</button>
       </div>
       <div id="logs" class="logs"></div>
+    </div>
+  </div>
+
+  <!-- 服务管理面板 -->
+  <div class="panel" id="servicesPanel" style="margin-top:20px;display:none">
+    <h2>服务管理面板</h2>
+    <div class="body">
+      <div id="servicesGrid" class="services-grid">
+        <div style="grid-column:1/-1;text-align:center;color:#666;padding:20px">
+          点击"刷新服务列表"加载可用服务
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
 (() => {
-  const $ = id=>document.getElementById(id);
-  const fmt = t=>new Date(t).toLocaleString();
-  const tryJ = (t,f)=>{try{return JSON.parse(t)}catch{return f}};
-  const pretty = x=>{try{return JSON.stringify(typeof x==='string'?JSON.parse(x):x,null,2)}catch{return typeof x==='string'?x:JSON.stringify(x,null,2)}};
+  const $ = id => document.getElementById(id);
+  const fmt = t => new Date(t).toLocaleString();
+  const tryJ = (t,f) => {try{return JSON.parse(t)}catch{return f}};
+  const pretty = x => {try{return JSON.stringify(typeof x==='string'?JSON.parse(x):x,null,2)}catch{return typeof x==='string'?x:JSON.stringify(x,null,2)}};
 
-  const state={logs:[], ws:null};
+  const state = {logs:[], ws:null, services:[]};
 
-  function add(kind, meta={}, blocks=[]){ state.logs.push({kind,when:Date.now(),meta,blocks}); render(); }
+  function add(kind, meta={}, blocks=[]){ 
+    state.logs.push({kind,when:Date.now(),meta,blocks}); 
+    render(); 
+  }
+
   function render(){
     const q = $('search').value.trim().toLowerCase();
-    const beaut = $('pretty').checked; const box = $('logs'); box.innerHTML='';
-    for(const e of state.logs){
-      const raw = JSON.stringify(e).toLowerCase(); if(q && !raw.includes(q)) continue;
-      const wrap = document.createElement('div'); wrap.className='entry '+(e.kind||'req');
-      const meta = document.createElement('div'); meta.className='meta';
-      if(e.meta.time) meta.appendChild(span(`[${fmt(e.meta.time)}]`));
-      if(e.meta.method) meta.appendChild(span(e.meta.method));
-      if(e.meta.url) meta.appendChild(span(e.meta.url));
-      if(e.meta.status!=null) meta.appendChild(span(String(e.meta.status)));
-      if(e.meta.ms!=null) meta.appendChild(span(`${e.meta.ms}ms`));
-      if(e.meta.size!=null) meta.appendChild(span(`${e.meta.size}B`));
+    const beaut = $('pretty').checked; 
+    const box = $('logs'); 
+    box.innerHTML='';
+    
+    const filtered = q ? state.logs.filter(e => JSON.stringify(e).toLowerCase().includes(q)) : state.logs;
+    
+    for(const e of filtered.slice(-50)){ // 只显示最近50条
+      const wrap = document.createElement('div'); 
+      wrap.className='entry '+(e.kind||'req');
+      
+      const meta = document.createElement('div'); 
+      meta.className='meta';
+      if(e.meta.time) meta.appendChild(tag(`${fmt(e.meta.time)}`));
+      if(e.meta.method) meta.appendChild(tag(e.meta.method, '#4fc3f7'));
+      if(e.meta.url) meta.appendChild(tag(e.meta.url.replace(window.location.origin + '/ieg-serviceapi', '')));
+      if(e.meta.status!=null) {
+        const statusColor = e.meta.status >= 200 && e.meta.status < 300 ? '#4caf50' : '#f44336';
+        meta.appendChild(tag(String(e.meta.status), statusColor));
+      }
+      if(e.meta.ms!=null) meta.appendChild(tag(`${e.meta.ms}ms`));
+      if(e.meta.size!=null) meta.appendChild(tag(`${Math.round(e.meta.size/1024*10)/10}KB`));
       wrap.appendChild(meta);
+      
       for(const b of e.blocks){
-        const d=document.createElement('details'); const s=document.createElement('summary'); s.textContent=b.title;
-        const pre=document.createElement('pre'); pre.textContent= beaut? pretty(b.content): (typeof b.content==='string'?b.content:JSON.stringify(b.content));
-        d.append(s,pre); wrap.appendChild(d);
+        const d=document.createElement('details'); 
+        if(b.title.includes('响应体') && e.kind === 'res') d.open = true;
+        const s=document.createElement('summary'); 
+        s.textContent=b.title;
+        const pre=document.createElement('pre'); 
+        pre.textContent= beaut? pretty(b.content): (typeof b.content==='string'?b.content:JSON.stringify(b.content));
+        d.append(s,pre); 
+        wrap.appendChild(d);
       }
       box.appendChild(wrap);
     }
     if($('autoScroll').checked) box.scrollTop = box.scrollHeight;
   }
-  const span=t=>{const s=document.createElement('span'); s.textContent=t; return s};
 
-  // ---- WS (接收后端广播的 http_request/script_* 等事件) ----
+  const tag = (text, color) => {
+    const span = document.createElement('span');
+    span.className = 'tag';
+    span.textContent = text;
+    if(color) span.style.borderColor = color;
+    return span;
+  };
+
+  // WebSocket连接
   function connectWS(){
-    const proto = location.protocol==='https:'?'wss:':'ws:'; const url = `${proto}//${location.host}`;
+    const proto = location.protocol==='https:'?'wss:':'ws:'; 
+    const url = `${proto}//${location.host}`;
     try{
       state.ws = new WebSocket(url);
       state.ws.onopen = ()=> setWS(true);
-      state.ws.onclose= ()=> { setWS(false); setTimeout(connectWS, 3000); };
+      state.ws.onclose= ()=> { setWS(false); setTimeout(connectWS, 5000); };
       state.ws.onerror= ()=> setWS(false);
       state.ws.onmessage = ev => {
         try{
           const msg = JSON.parse(ev.data);
-          if(msg.type==='http_request'){
-            add('ws',{time:Date.now()},[{title:'HTTP 请求（WS广播）',content:{method:msg.method,url:msg.url,headers:msg.headers,body:msg.body}}]);
-          }else{
-            add('ws',{time:Date.now()},[{title:`WS: ${msg.type||'message'}`,content:msg}]);
-          }
-        }catch{ add('ws',{time:Date.now()},[{title:'WS 原始消息',content:ev.data}]); }
+          add('ws',{time:Date.now()},[{title:`WebSocket: ${msg.type||'message'}`,content:msg}]);
+        }catch{ 
+          add('ws',{time:Date.now()},[{title:'WebSocket 原始消息',content:ev.data}]); 
+        }
       };
-    }catch{}
+    }catch(e){
+      console.error('WebSocket connection failed:', e);
+    }
   }
-  function setWS(ok){ const el=$('wsState'); el.textContent= ok?'WS 已连接':'WS 未连接'; el.className='status '+(ok?'ok':'bad'); }
 
-  // ---- 发送请求：把“具体 HTTP 请求”与“响应”都写入日志 ----
+  function setWS(ok){ 
+    const el=$('wsState'); 
+    el.textContent= ok?'WebSocket 连接':'WebSocket 断开'; 
+    el.className='status '+(ok?'ok':'bad'); 
+  }
+
+  // 发送请求
   async function send(){
     const base = ($('apiBase').value || (window.location.origin + '/ieg-serviceapi')).replace(/\/+$/,'');
-    const m = $('method').value; const ep = $('endpoint').value.trim() || '/health';
-    const url = base + (ep.startsWith('/')?ep:'/'+ep);
+    const m = $('method').value; 
+    
+    let endpoint = $('endpoint').value;
+    if(endpoint === 'custom') {
+      endpoint = $('customEndpoint').value.trim() || '/health';
+    }
+    
+    const url = base + (endpoint.startsWith('/')?endpoint:'/'+endpoint);
     const headers = tryJ($('headers').value||'{}',{});
     if(!headers['Content-Type'] && m!=='GET') headers['Content-Type']='application/json';
     let bodyText = $('body').value.trim();
-    if(m!=='GET' && bodyText){ try{ JSON.parse(bodyText) }catch(e){ add('err',{time:Date.now()},[{title:'无效的JSON',content:String(e)}]); return; } }
+    if(m!=='GET' && bodyText){ 
+      try{ JSON.parse(bodyText) }catch(e){ 
+        add('err',{time:Date.now()},[{title:'JSON格式错误',content:String(e)}]); 
+        return; 
+      } 
+    }
 
     const started = performance.now();
-    add('req',{time:Date.now(),method:m,url},[{title:'请求头',content:headers},{title:'请求体',content:bodyText||null}]);
+    add('req',{time:Date.now(),method:m,url},[
+      {title:'请求头',content:headers},
+      {title:'请求体',content:bodyText||null}
+    ]);
 
     try{
-      const res = await fetch(url,{method:m,headers,body:(m==='GET'?undefined:(bodyText||undefined))});
+      const res = await fetch(url,{
+        method:m,
+        headers,
+        body:(m==='GET'?undefined:(bodyText||undefined))
+      });
+      
       const ms = Math.round(performance.now()-started);
-      const rh={}; res.headers.forEach((v,k)=>rh[k]=v);
-      const text = await res.text(); let data=text; if((rh['content-type']||'').includes('application/json')){ try{data=JSON.parse(text)}catch{} }
-      add(res.ok?'res':'err',{time:Date.now(),method:m,url,status:res.status,ms,size:text.length},[{title:'响应头',content:rh},{title:'响应体',content:data}]);
-    }catch(e){ add('err',{time:Date.now(),method:m,url},[{title:'请求失败',content:String(e)}]); }
+      const rh={}; 
+      res.headers.forEach((v,k)=>rh[k]=v);
+      const text = await res.text(); 
+      let data=text; 
+      if((rh['content-type']||'').includes('application/json')){ 
+        try{data=JSON.parse(text)}catch{} 
+      }
+      
+      add(res.ok?'res':'err',{
+        time:Date.now(),method:m,url,status:res.status,ms,size:text.length
+      },[
+        {title:'响应头',content:rh},
+        {title:'响应体',content:data}
+      ]);
+      
+      // 如果是服务列表请求，更新服务计数
+      if(endpoint === '/services' && res.ok && typeof data === 'object' && data.services) {
+        state.services = data.services;
+        updateServiceCount();
+        renderServices();
+      }
+    }catch(e){ 
+      add('err',{time:Date.now(),method:m,url},[{title:'请求失败',content:String(e)}]); 
+    }
 
-    // 记忆
-    localStorage.setItem('dbg.base', $('apiBase').value);
-    localStorage.setItem('dbg.m', $('method').value);
-    localStorage.setItem('dbg.e', $('endpoint').value);
-    localStorage.setItem('dbg.h', $('headers').value);
-    localStorage.setItem('dbg.b', $('body').value);
+    // 保存配置
+    saveConfig();
   }
 
+  // 快速请求
+  window.quickRequest = (endpoint, method = 'GET', body = '') => {
+    $('endpoint').value = 'custom';
+    $('customEndpoint').value = endpoint;
+    $('method').value = method;
+    if(body) $('body').value = body;
+    toggleCustomEndpoint();
+    send();
+  };
+
+  // 切换自定义端点输入框
+  function toggleCustomEndpoint() {
+    const isCustom = $('endpoint').value === 'custom';
+    $('customEndpointRow').style.display = isCustom ? 'grid' : 'none';
+  }
+
+  // 加载服务列表
+  async function loadServices() {
+    add('req',{time:Date.now()},[{title:'加载服务列表',content:'正在获取可用服务...'}]);
+    await quickRequest('/services', 'GET');
+  }
+
+  // 更新服务计数显示
+  function updateServiceCount() {
+    $('serviceCount').textContent = `服务: ${state.services.length}`;
+  }
+
+  // 渲染服务面板
+  function renderServices() {
+    const grid = $('servicesGrid');
+    if(state.services.length === 0) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#666;padding:20px">未找到可用服务</div>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    state.services.forEach(service => {
+      const card = document.createElement('div');
+      card.className = 'service-card';
+      card.innerHTML = `
+        <h4>${service.display_name || service.id}</h4>
+        <div style="font-size:12px;color:#999;margin-bottom:8px">
+          ${service.notes || 'ID: ' + service.id}<br>
+          版本: ${service.latest_service_version || 'N/A'}
+        </div>
+        <div class="service-actions">
+          <button class="btn" onclick="serviceAction('${service.id}','status')">状态</button>
+          <button class="btn" onclick="serviceAction('${service.id}','autocheck')">检查</button>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  // 服务操作
+  window.serviceAction = (serviceId, action) => {
+    if(action === 'status') {
+      quickRequest(`/services/${serviceId}/status`, 'GET');
+    } else {
+      quickRequest(`/services/${serviceId}/execute/${action}`, 'POST', '{"params":{"json":true}}');
+    }
+  };
+
+  // 切换服务面板显示
+  window.toggleServices = () => {
+    const panel = $('servicesPanel');
+    const isVisible = panel.style.display !== 'none';
+    panel.style.display = isVisible ? 'none' : 'block';
+  };
+
+  // 配置保存和加载
+  function saveConfig() {
+    localStorage.setItem('ieg-debug.base', $('apiBase').value);
+    localStorage.setItem('ieg-debug.method', $('method').value);
+    localStorage.setItem('ieg-debug.endpoint', $('endpoint').value);
+    localStorage.setItem('ieg-debug.customEndpoint', $('customEndpoint').value);
+    localStorage.setItem('ieg-debug.headers', $('headers').value);
+    localStorage.setItem('ieg-debug.body', $('body').value);
+  }
+
+  function loadConfig() {
+    $('apiBase').value = localStorage.getItem('ieg-debug.base') || (window.location.origin + '/ieg-serviceapi');
+    $('method').value = localStorage.getItem('ieg-debug.method') || 'GET';
+    $('endpoint').value = localStorage.getItem('ieg-debug.endpoint') || '/health';
+    $('customEndpoint').value = localStorage.getItem('ieg-debug.customEndpoint') || '';
+    $('headers').value = localStorage.getItem('ieg-debug.headers') || '{"Content-Type":"application/json"}';
+    $('body').value = localStorage.getItem('ieg-debug.body') || '';
+  }
+
+  // 初始化
   function init(){
-    $('apiBase').value = localStorage.getItem('dbg.base') || (window.location.origin + '/ieg-serviceapi');
-    $('method').value  = localStorage.getItem('dbg.m') || 'GET';
-    $('endpoint').value= localStorage.getItem('dbg.e') || '/health';
-    $('headers').value = localStorage.getItem('dbg.h') || '{"Content-Type":"application/json"}';
-    $('body').value    = localStorage.getItem('dbg.b') || '';
-
+    loadConfig();
+    toggleCustomEndpoint();
+    
     $('sendBtn').onclick = send;
-    $('clearBtn').onclick = ()=>{ state.logs=[]; render(); };
-    $('exportBtn').onclick= ()=>{ const blob=new Blob([JSON.stringify(state.logs,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='api-debug-logs.json'; a.click(); };
+    $('clearBtn').onclick = () => { state.logs=[]; render(); };
+    $('exportBtn').onclick = () => { 
+      const blob=new Blob([JSON.stringify(state.logs,null,2)],{type:'application/json'}); 
+      const a=document.createElement('a'); 
+      a.href=URL.createObjectURL(blob); 
+      a.download='ieg-api-debug-logs.json'; 
+      a.click(); 
+    };
+    $('loadServicesBtn').onclick = loadServices;
     $('search').oninput = render;
+    $('endpoint').onchange = toggleCustomEndpoint;
+    
+    // 自动连接WebSocket
     connectWS();
+    
+    // 自动加载服务列表
+    setTimeout(loadServices, 1000);
+    
+    add('info',{time:Date.now()},[{title:'调试控制台已启动',content:'IEG服务管理API调试控制台已准备就绪'}]);
   }
+  
   init();
 })();
 </script>
