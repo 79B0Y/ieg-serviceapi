@@ -4,6 +4,29 @@
 
 ## 功能特性
 
+### 完整的新API端点列表
+```bash
+# 系统健康检查
+curl http://localhost:3008/ieg-serviceapi/health
+
+# 服务管理
+curl http://localhost:3008/ieg-serviceapi/services
+curl http://localhost:3008/ieg-serviceapi/services/hass
+curl http://localhost:3008/ieg-serviceapi/services/hass/status
+curl -X POST http://localhost:3008/ieg-serviceapi/services/hass/execute/autocheck
+
+# 批量操作
+curl -X POST http://localhost:3008/ieg-serviceapi/services/batch/start \
+  -H "Content-Type: application/json" \
+  -d '{"services": ["hass", "mosquitto"]}'
+
+# 配置管理
+curl -X POST http://localhost:3008/ieg-serviceapi/services/reload
+
+# WebSocket状态
+curl http://localhost:3008/ieg-serviceapi/websocket/clients
+```
+
 ### 核心功能
 - **多服务支持**: 自动发现和管理 `serviceupdate.json` 中配置的所有服务
 - **实时监控**: WebSocket 实时推送脚本执行状态和输出
