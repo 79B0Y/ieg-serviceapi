@@ -1,984 +1,199 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多服务管理API调试界面</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
-            background: #1e1e1e;
-            color: #d4d4d4;
-            line-height: 1.5;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .header {
-            background: #252526;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border: 1px solid #3c3c3c;
-        }
-
-        .header h1 {
-            color: #4fc3f7;
-            font-size: 24px;
-            margin-bottom: 10px;
-        }
-
-        .connection-status {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .connected {
-            background: #2e7d32;
-            color: white;
-        }
-
-        .disconnected {
-            background: #d32f2f;
-            color: white;
-        }
-
-        .main-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            height: calc(100vh - 140px);
-        }
-
-        .panel {
-            background: #252526;
-            border-radius: 8px;
-            border: 1px solid #3c3c3c;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .panel-header {
-            background: #2d2d30;
-            padding: 15px;
-            border-bottom: 1px solid #3c3c3c;
-            border-radius: 8px 8px 0 0;
-        }
-
-        .panel-header h2 {
-            color: #569cd6;
-            font-size: 16px;
-        }
-
-        .panel-content {
-            flex: 1;
-            padding: 15px;
-            overflow-y: auto;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            color: #9cdcfe;
-            margin-bottom: 5px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .form-group select,
-        .form-group input,
-        .form-group textarea {
-            width: 100%;
-            background: #1e1e1e;
-            border: 1px solid #3c3c3c;
-            color: #d4d4d4;
-            padding: 8px;
-            border-radius: 4px;
-            font-family: inherit;
-            font-size: 12px;
-        }
-
-        .form-group select:focus,
-        .form-group input:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: #007acc;
-            box-shadow: 0 0 0 1px #007acc;
-        }
-
-        .form-group textarea {
-            min-height: 100px;
-            resize: vertical;
-        }
-
-        .btn {
-            background: #0e639c;
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 12px;
-            margin-right: 10px;
-            margin-bottom: 10px;
-        }
-
-        .btn:hover {
-            background: #1177bb;
-        }
-
-        .btn:disabled {
-            background: #3c3c3c;
-            cursor: not-allowed;
-        }
-
-        .btn-success {
-            background: #2e7d32;
-        }
-
-        .btn-success:hover {
-            background: #388e3c;
-        }
-
-        .btn-danger {
-            background: #d32f2f;
-        }
-
-        .btn-danger:hover {
-            background: #f44336;
-        }
-
-        .btn-secondary {
-            background: #424242;
-        }
-
-        .btn-secondary:hover {
-            background: #616161;
-        }
-
-        .response-area {
-            background: #0d1117;
-            border: 1px solid #3c3c3c;
-            border-radius: 4px;
-            padding: 15px;
-            height: 300px;
-            overflow-y: auto;
-            font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 11px;
-            white-space: pre-wrap;
-        }
-
-        .log-entry {
-            margin-bottom: 10px;
-            padding: 8px;
-            border-radius: 4px;
-            border-left: 3px solid transparent;
-        }
-
-        .log-entry.request {
-            background: #1a2332;
-            border-left-color: #4fc3f7;
-        }
-
-        .log-entry.response {
-            background: #1e2a1e;
-            border-left-color: #4caf50;
-        }
-
-        .log-entry.error {
-            background: #2d1b1b;
-            border-left-color: #f44336;
-        }
-
-        .log-entry.websocket {
-            background: #2a1e32;
-            border-left-color: #9c27b0;
-        }
-
-        .timestamp {
-            color: #888;
-            font-size: 10px;
-        }
-
-        .method {
-            color: #4fc3f7;
-            font-weight: bold;
-        }
-
-        .url {
-            color: #9cdcfe;
-        }
-
-        .status-200 { color: #4caf50; }
-        .status-400 { color: #ff9800; }
-        .status-500 { color: #f44336; }
-
-        .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .services-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .service-card {
-            background: #1e1e1e;
-            border: 1px solid #3c3c3c;
-            border-radius: 4px;
-            padding: 10px;
-        }
-
-        .service-card.enabled {
-            border-color: #4caf50;
-        }
-
-        .service-card.disabled {
-            border-color: #f44336;
-            opacity: 0.6;
-        }
-
-        .service-name {
-            color: #4fc3f7;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        .service-version {
-            color: #9cdcfe;
-            font-size: 11px;
-        }
-
-        .service-status {
-            margin-top: 5px;
-            padding: 2px 6px;
-            border-radius: 2px;
-            font-size: 10px;
-            display: inline-block;
-        }
-
-        .status-running { background: #2e7d32; color: white; }
-        .status-stopped { background: #d32f2f; color: white; }
-        .status-starting { background: #ff9800; color: white; }
-        .status-unknown { background: #424242; color: white; }
-
-        .json-editor {
-            background: #0d1117;
-            border: 1px solid #3c3c3c;
-            color: #d4d4d4;
-            padding: 10px;
-            border-radius: 4px;
-            font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 11px;
-            min-height: 150px;
-            resize: vertical;
-        }
-
-        .tabs {
-            display: flex;
-            background: #2d2d30;
-            border-bottom: 1px solid #3c3c3c;
-        }
-
-        .tab {
-            padding: 10px 15px;
-            background: none;
-            border: none;
-            color: #cccccc;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 12px;
-            border-bottom: 2px solid transparent;
-        }
-
-        .tab.active {
-            color: #4fc3f7;
-            border-bottom-color: #4fc3f7;
-        }
-
-        .tab-content {
-            display: none;
-            padding: 15px;
-            flex: 1;
-            overflow-y: auto;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .clear-btn {
-            float: right;
-            background: #424242;
-            color: white;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 2px;
-            cursor: pointer;
-            font-size: 10px;
-        }
-
-        .clear-btn:hover {
-            background: #616161;
-        }
-
-        .endpoint-list {
-            margin-bottom: 15px;
-        }
-
-        .endpoint-item {
-            background: #1e1e1e;
-            border: 1px solid #3c3c3c;
-            border-radius: 4px;
-            padding: 10px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .endpoint-item:hover {
-            background: #2d2d30;
-        }
-
-        .endpoint-method {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 2px;
-            font-size: 10px;
-            font-weight: bold;
-            margin-right: 10px;
-        }
-
-        .method-get { background: #4caf50; }
-        .method-post { background: #2196f3; }
-        .method-put { background: #ff9800; }
-        .method-delete { background: #f44336; }
-
-        @media (max-width: 768px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-                height: auto;
-            }
-            
-            .services-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>多服务管理 API 调试台（增强版）</title>
+  <style>
+    :root{--bg:#1e1e1e;--panel:#252526;--panel2:#2d2d30;--border:#3c3c3c;--text:#d4d4d4;--blue:#4fc3f7;--green:#4caf50;--red:#f44336}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--bg);color:var(--text)}
+    .container{max-width:1450px;margin:0 auto;padding:18px}
+    .header{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+    .header h1{color:var(--blue);font-size:18px}
+    .status{padding:6px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px}
+    .ok{background:#1a3327;color:#9be7c4} .bad{background:#3a2222;color:#ffcdd2}
+    .grid{display:grid;grid-template-columns:520px 1fr;gap:16px}
+    .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+    .panel h2{font-size:14px;color:#9cdcfe;background:var(--panel2);padding:10px 12px;border-bottom:1px solid var(--border)}
+    .body{padding:12px}
+    .row{display:grid;grid-template-columns:110px 1fr;gap:10px;margin-bottom:10px}
+    label{color:#9cdcfe;font-size:12px;line-height:28px}
+    input,select,textarea{width:100%;background:#0d1117;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:12px}
+    textarea{min-height:110px;resize:vertical}
+    .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .btn{background:#0e639c;border:none;border-radius:8px;color:#fff;padding:9px 12px;font-size:12px;cursor:pointer}
+    .btn:hover{background:#1177bb}
+    .btn.secondary{background:#424242}.btn.secondary:hover{background:#616161}
+    .btn.success{background:#2e7d32}.btn.success:hover{background:#39863d}
+    .logs-toolbar{display:flex;gap:8px;align-items:center;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--border)}
+    .logs{flex:1;overflow:auto;padding:10px}
+    .entry{border-left:3px solid var(--blue);background:#0b0f14;border:1px solid #22303f;margin:0 0 10px;border-radius:8px;padding:8px}
+    .res{border-left-color:var(--green)} .err{border-left-color:var(--red)} .ws{border-left-color:#b388ff}
+    .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:#9aa7b0;margin-bottom:6px}
+    .kv{display:grid;grid-template-columns:110px 1fr;gap:6px;font-size:12px;margin:6px 0}
+    details{background:#0d1117;border:1px solid #233043;border-radius:6px;margin-top:6px}
+    summary{cursor:pointer;padding:6px 10px;color:#a5d6ff}
+    pre{margin:0;padding:10px 12px;white-space:pre-wrap;word-break:break-word;font-size:12px}
+    @media (max-width:1100px){.grid{grid-template-columns:1fr}}
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>多服务管理API调试界面</h1>
-            <div class="connection-status" id="connectionStatus">连接中...</div>
+<div class="container">
+  <div class="header">
+    <h1>多服务管理 API 调试台</h1>
+    <div id="wsState" class="status bad">WS 未连接</div>
+  </div>
+
+  <div class="grid">
+    <!-- 左：请求构建器 -->
+    <div class="panel">
+      <h2>请求构建器</h2>
+      <div class="body">
+        <div class="row">
+          <label>API 基址</label>
+          <input id="apiBase" />
         </div>
-
-        <div class="main-grid">
-            <div class="panel">
-                <div class="tabs">
-                    <button class="tab active" onclick="switchTab('request')">API请求</button>
-                    <button class="tab" onclick="switchTab('services')">服务列表</button>
-                    <button class="tab" onclick="switchTab('batch')">批量操作</button>
-                </div>
-
-                <div class="tab-content active" id="tab-request">
-                    <div class="quick-actions">
-                        <button class="btn btn-success" onclick="loadServices()">获取服务列表</button>
-                        <button class="btn" onclick="getAllStatus()">获取所有状态</button>
-                        <button class="btn" onclick="reloadConfig()">重新加载配置</button>
-                        <button class="btn btn-secondary" onclick="getHealth()">健康检查</button>
-                    </div>
-
-                    <div class="form-group">
-                        <label>请求方法</label>
-                        <select id="requestMethod">
-                            <option value="GET">GET</option>
-                            <option value="POST">POST</option>
-                            <option value="PUT">PUT</option>
-                            <option value="DELETE">DELETE</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>API端点</label>
-                        <input type="text" id="apiEndpoint" placeholder="/api/services" value="/api/health">
-                    </div>
-
-                    <div class="form-group">
-                        <label>请求体 (JSON)</label>
-                        <textarea id="requestBody" class="json-editor" placeholder='{"key": "value"}'></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <button class="btn" onclick="sendRequest()">发送请求</button>
-                        <button class="btn btn-secondary" onclick="clearLogs()">清空日志</button>
-                    </div>
-
-                    <div class="endpoint-list">
-                        <h3 style="color: #9cdcfe; margin-bottom: 10px;">常用端点</h3>
-                        <div class="endpoint-item" onclick="setEndpoint('GET', '/api/health')">
-                            <span class="endpoint-method method-get">GET</span>
-                            <span class="url">/api/health</span>
-                        </div>
-                        <div class="endpoint-item" onclick="setEndpoint('GET', '/api/services')">
-                            <span class="endpoint-method method-get">GET</span>
-                            <span class="url">/api/services</span>
-                        </div>
-                        <div class="endpoint-item" onclick="setEndpoint('GET', '/api/services/hass/status')">
-                            <span class="endpoint-method method-get">GET</span>
-                            <span class="url">/api/services/hass/status</span>
-                        </div>
-                        <div class="endpoint-item" onclick="setEndpoint('POST', '/api/services/hass/execute/autocheck')">
-                            <span class="endpoint-method method-post">POST</span>
-                            <span class="url">/api/services/hass/execute/autocheck</span>
-                        </div>
-                        <div class="endpoint-item" onclick="setEndpoint('POST', '/api/services/batch/start')">
-                            <span class="endpoint-method method-post">POST</span>
-                            <span class="url">/api/services/batch/start</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tab-content" id="tab-services">
-                    <div style="margin-bottom: 15px;">
-                        <button class="btn" onclick="refreshServices()">刷新服务</button>
-                        <button class="btn btn-success" onclick="startAllServices()">启动所有</button>
-                        <button class="btn btn-danger" onclick="stopAllServices()">停止所有</button>
-                    </div>
-                    <div class="services-grid" id="servicesGrid">
-                        <div style="grid-column: 1/-1; text-align: center; color: #888;">
-                            点击"刷新服务"加载服务列表
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tab-content" id="tab-batch">
-                    <div class="form-group">
-                        <label>选择服务 (多选)</label>
-                        <select id="batchServices" multiple style="min-height: 120px;">
-                            <option value="hass">Home Assistant</option>
-                            <option value="zigbee2mqtt">Zigbee2MQTT</option>
-                            <option value="mosquitto">Mosquitto</option>
-                            <option value="node-red">Node-RED</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>执行脚本</label>
-                        <select id="batchScript">
-                            <option value="autocheck">状态检查</option>
-                            <option value="start">启动</option>
-                            <option value="stop">停止</option>
-                            <option value="backup">备份</option>
-                            <option value="update">更新</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>参数 (JSON)</label>
-                        <textarea id="batchParams" class="json-editor" placeholder='{"timeout": 30000}'>{}</textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <button class="btn" onclick="executeBatch()">执行批量操作</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="panel">
-                <div class="panel-header">
-                    <h2>响应日志</h2>
-                    <button class="clear-btn" onclick="clearLogs()">清空</button>
-                </div>
-                <div class="panel-content">
-                    <div class="response-area" id="responseArea">
-                        <div class="log-entry">
-                            <span class="timestamp">[等待请求]</span> 准备调试API接口...
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="row">
+          <label>方法</label>
+          <select id="method"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>
         </div>
+        <div class="row">
+          <label>端点</label>
+          <input id="endpoint" placeholder="/services 或 /services/hass/status" />
+        </div>
+        <div class="row">
+          <label>Headers (JSON)</label>
+          <textarea id="headers" spellcheck="false" placeholder='{"Content-Type":"application/json"}'></textarea>
+        </div>
+        <div class="row">
+          <label>Body (JSON)</label>
+          <textarea id="body" spellcheck="false" placeholder='{"timeout":30000,"params":{"json":true}}'></textarea>
+        </div>
+        <div class="btns">
+          <button class="btn success" id="sendBtn">发送请求</button>
+          <button class="btn secondary" id="clearBtn">清空日志</button>
+          <button class="btn secondary" id="exportBtn">导出日志</button>
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:#aaa">
+          说明：默认基址为 <b>当前页面 origin + /ieg-serviceapi</b>（即 3008 端口下的新前缀）。
+        </div>
+      </div>
     </div>
 
-    <script>
-        class APIDebugger {
-            constructor() {
-                this.ws = null;
-                this.services = [];
-                this.apiBase = window.location.origin;
-                this.initWebSocket();
-                this.loadServicesOnStart();
-            }
+    <!-- 右：日志面板 -->
+    <div class="panel" style="min-height:540px">
+      <div class="logs-toolbar">
+        <input id="search" placeholder="搜索（URL/状态码/内容）" style="flex:1;padding:6px 10px" />
+        <label style="font-size:12px"><input type="checkbox" id="autoScroll" checked> 自动滚动</label>
+        <label style="font-size:12px"><input type="checkbox" id="pretty" checked> JSON美化</label>
+      </div>
+      <div id="logs" class="logs"></div>
+    </div>
+  </div>
+</div>
 
-            initWebSocket() {
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${protocol}//${window.location.host}`;
-                
-                this.ws = new WebSocket(wsUrl);
-                
-                this.ws.onopen = () => {
-                    this.updateConnectionStatus(true);
-                    this.log('WebSocket', '连接已建立');
-                };
-                
-                this.ws.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        this.log('WebSocket', `收到消息: ${data.type}`, data);
-                    } catch (error) {
-                        this.log('WebSocket', `消息解析失败: ${error.message}`, null, 'error');
-                    }
-                };
-                
-                this.ws.onclose = () => {
-                    this.updateConnectionStatus(false);
-                    this.log('WebSocket', '连接已断开', null, 'websocket');
-                    
-                    setTimeout(() => {
-                        if (this.ws.readyState === WebSocket.CLOSED) {
-                            this.initWebSocket();
-                        }
-                    }, 5000);
-                };
-                
-                this.ws.onerror = (error) => {
-                    this.log('WebSocket', '连接错误', error, 'error');
-                };
-            }
+<script>
+(() => {
+  const $ = id=>document.getElementById(id);
+  const fmt = t=>new Date(t).toLocaleString();
+  const tryJ = (t,f)=>{try{return JSON.parse(t)}catch{return f}};
+  const pretty = x=>{try{return JSON.stringify(typeof x==='string'?JSON.parse(x):x,null,2)}catch{return typeof x==='string'?x:JSON.stringify(x,null,2)}};
 
-            updateConnectionStatus(connected) {
-                const status = document.getElementById('connectionStatus');
-                if (connected) {
-                    status.className = 'connection-status connected';
-                    status.textContent = '已连接';
-                } else {
-                    status.className = 'connection-status disconnected';
-                    status.textContent = '已断开';
-                }
-            }
+  const state={logs:[], ws:null};
 
-            async sendRequest() {
-                const method = document.getElementById('requestMethod').value;
-                const endpoint = document.getElementById('apiEndpoint').value;
-                const bodyText = document.getElementById('requestBody').value;
-                
-                const url = `${this.apiBase}${endpoint}`;
-                
-                const options = {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                };
+  function add(kind, meta={}, blocks=[]){ state.logs.push({kind,when:Date.now(),meta,blocks}); render(); }
+  function render(){
+    const q = $('search').value.trim().toLowerCase();
+    const beaut = $('pretty').checked; const box = $('logs'); box.innerHTML='';
+    for(const e of state.logs){
+      const raw = JSON.stringify(e).toLowerCase(); if(q && !raw.includes(q)) continue;
+      const wrap = document.createElement('div'); wrap.className='entry '+(e.kind||'req');
+      const meta = document.createElement('div'); meta.className='meta';
+      if(e.meta.time) meta.appendChild(span(`[${fmt(e.meta.time)}]`));
+      if(e.meta.method) meta.appendChild(span(e.meta.method));
+      if(e.meta.url) meta.appendChild(span(e.meta.url));
+      if(e.meta.status!=null) meta.appendChild(span(String(e.meta.status)));
+      if(e.meta.ms!=null) meta.appendChild(span(`${e.meta.ms}ms`));
+      if(e.meta.size!=null) meta.appendChild(span(`${e.meta.size}B`));
+      wrap.appendChild(meta);
+      for(const b of e.blocks){
+        const d=document.createElement('details'); const s=document.createElement('summary'); s.textContent=b.title;
+        const pre=document.createElement('pre'); pre.textContent= beaut? pretty(b.content): (typeof b.content==='string'?b.content:JSON.stringify(b.content));
+        d.append(s,pre); wrap.appendChild(d);
+      }
+      box.appendChild(wrap);
+    }
+    if($('autoScroll').checked) box.scrollTop = box.scrollHeight;
+  }
+  const span=t=>{const s=document.createElement('span'); s.textContent=t; return s};
 
-                if (method !== 'GET' && bodyText.trim()) {
-                    try {
-                        options.body = bodyText;
-                        JSON.parse(bodyText); // 验证JSON格式
-                    } catch (error) {
-                        this.log('请求', '无效的JSON格式', { error: error.message }, 'error');
-                        return;
-                    }
-                }
+  // ---- WS (接收后端广播的 http_request/script_* 等事件) ----
+  function connectWS(){
+    const proto = location.protocol==='https:'?'wss:':'ws:'; const url = `${proto}//${location.host}`;
+    try{
+      state.ws = new WebSocket(url);
+      state.ws.onopen = ()=> setWS(true);
+      state.ws.onclose= ()=> { setWS(false); setTimeout(connectWS, 3000); };
+      state.ws.onerror= ()=> setWS(false);
+      state.ws.onmessage = ev => {
+        try{
+          const msg = JSON.parse(ev.data);
+          if(msg.type==='http_request'){
+            add('ws',{time:Date.now()},[{title:'HTTP 请求（WS广播）',content:{method:msg.method,url:msg.url,headers:msg.headers,body:msg.body}}]);
+          }else{
+            add('ws',{time:Date.now()},[{title:`WS: ${msg.type||'message'}`,content:msg}]);
+          }
+        }catch{ add('ws',{time:Date.now()},[{title:'WS 原始消息',content:ev.data}]); }
+      };
+    }catch{}
+  }
+  function setWS(ok){ const el=$('wsState'); el.textContent= ok?'WS 已连接':'WS 未连接'; el.className='status '+(ok?'ok':'bad'); }
 
-                this.log('请求', `${method} ${endpoint}`, { 
-                    url: url, 
-                    body: bodyText || null 
-                });
+  // ---- 发送请求：把“具体 HTTP 请求”与“响应”都写入日志 ----
+  async function send(){
+    const base = ($('apiBase').value || (window.location.origin + '/ieg-serviceapi')).replace(/\/+$/,'');
+    const m = $('method').value; const ep = $('endpoint').value.trim() || '/health';
+    const url = base + (ep.startsWith('/')?ep:'/'+ep);
+    const headers = tryJ($('headers').value||'{}',{});
+    if(!headers['Content-Type'] && m!=='GET') headers['Content-Type']='application/json';
+    let bodyText = $('body').value.trim();
+    if(m!=='GET' && bodyText){ try{ JSON.parse(bodyText) }catch(e){ add('err',{time:Date.now()},[{title:'无效的JSON',content:String(e)}]); return; } }
 
-                try {
-                    const response = await fetch(url, options);
-                    const responseText = await response.text();
-                    let responseData;
-                    
-                    try {
-                        responseData = JSON.parse(responseText);
-                    } catch (error) {
-                        responseData = responseText;
-                    }
+    const started = performance.now();
+    add('req',{time:Date.now(),method:m,url},[{title:'请求头',content:headers},{title:'请求体',content:bodyText||null}]);
 
-                    const logType = response.ok ? 'response' : 'error';
-                    this.log('响应', `${response.status} ${response.statusText}`, {
-                        status: response.status,
-                        headers: Object.fromEntries(response.headers.entries()),
-                        data: responseData
-                    }, logType);
+    try{
+      const res = await fetch(url,{method:m,headers,body:(m==='GET'?undefined:(bodyText||undefined))});
+      const ms = Math.round(performance.now()-started);
+      const rh={}; res.headers.forEach((v,k)=>rh[k]=v);
+      const text = await res.text(); let data=text; if((rh['content-type']||'').includes('application/json')){ try{data=JSON.parse(text)}catch{} }
+      add(res.ok?'res':'err',{time:Date.now(),method:m,url,status:res.status,ms,size:text.length},[{title:'响应头',content:rh},{title:'响应体',content:data}]);
+    }catch(e){ add('err',{time:Date.now(),method:m,url},[{title:'请求失败',content:String(e)}]); }
 
-                } catch (error) {
-                    this.log('错误', '请求失败', { 
-                        error: error.message,
-                        endpoint: endpoint 
-                    }, 'error');
-                }
-            }
+    // 记忆
+    localStorage.setItem('dbg.base', $('apiBase').value);
+    localStorage.setItem('dbg.m', $('method').value);
+    localStorage.setItem('dbg.e', $('endpoint').value);
+    localStorage.setItem('dbg.h', $('headers').value);
+    localStorage.setItem('dbg.b', $('body').value);
+  }
 
-            async loadServicesOnStart() {
-                try {
-                    const response = await fetch(`${this.apiBase}/api/services`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        this.services = data.services || [];
-                        this.updateBatchServiceOptions();
-                    }
-                } catch (error) {
-                    console.warn('初始加载服务列表失败:', error);
-                }
-            }
+  function init(){
+    $('apiBase').value = localStorage.getItem('dbg.base') || (window.location.origin + '/ieg-serviceapi');
+    $('method').value  = localStorage.getItem('dbg.m') || 'GET';
+    $('endpoint').value= localStorage.getItem('dbg.e') || '/health';
+    $('headers').value = localStorage.getItem('dbg.h') || '{"Content-Type":"application/json"}';
+    $('body').value    = localStorage.getItem('dbg.b') || '';
 
-            async loadServices() {
-                document.getElementById('requestMethod').value = 'GET';
-                document.getElementById('apiEndpoint').value = '/api/services';
-                document.getElementById('requestBody').value = '';
-                await this.sendRequest();
-            }
-
-            async refreshServices() {
-                try {
-                    const response = await fetch(`${this.apiBase}/api/services`);
-                    const data = await response.json();
-                    this.services = data.services || [];
-                    this.renderServicesGrid();
-                    this.updateBatchServiceOptions();
-                    this.log('服务', '服务列表已刷新', { count: this.services.length });
-                } catch (error) {
-                    this.log('错误', '刷新服务列表失败', { error: error.message }, 'error');
-                }
-            }
-
-            renderServicesGrid() {
-                const grid = document.getElementById('servicesGrid');
-                
-                if (this.services.length === 0) {
-                    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #888;">未找到任何服务</div>';
-                    return;
-                }
-
-                grid.innerHTML = this.services.map(service => `
-                    <div class="service-card ${service.enabled ? 'enabled' : 'disabled'}">
-                        <div class="service-name">${service.display_name || service.id}</div>
-                        <div class="service-version">v${service.latest_service_version || 'unknown'}</div>
-                        <div class="service-status status-unknown" id="status-${service.id}">检查中</div>
-                        <div style="margin-top: 10px;">
-                            <button class="btn" style="font-size: 10px; padding: 4px 8px;" 
-                                onclick="debugger.executeServiceScript('${service.id}', 'autocheck')">检查</button>
-                            <button class="btn btn-success" style="font-size: 10px; padding: 4px 8px;" 
-                                onclick="debugger.executeServiceScript('${service.id}', 'start')">启动</button>
-                            <button class="btn btn-danger" style="font-size: 10px; padding: 4px 8px;" 
-                                onclick="debugger.executeServiceScript('${service.id}', 'stop')">停止</button>
-                        </div>
-                    </div>
-                `).join('');
-
-                // 加载每个服务的状态
-                this.services.forEach(service => {
-                    this.loadServiceStatus(service.id);
-                });
-            }
-
-            async loadServiceStatus(serviceId) {
-                try {
-                    const response = await fetch(`${this.apiBase}/api/services/${serviceId}/status`);
-                    const data = await response.json();
-                    
-                    const statusElement = document.getElementById(`status-${serviceId}`);
-                    if (statusElement) {
-                        const status = data.status || 'unknown';
-                        statusElement.textContent = this.getStatusText(status);
-                        statusElement.className = `service-status status-${status}`;
-                    }
-                } catch (error) {
-                    const statusElement = document.getElementById(`status-${serviceId}`);
-                    if (statusElement) {
-                        statusElement.textContent = '错误';
-                        statusElement.className = 'service-status status-unknown';
-                    }
-                }
-            }
-
-            getStatusText(status) {
-                const statusMap = {
-                    'running': '运行中',
-                    'stopped': '已停止',
-                    'starting': '启动中',
-                    'stopping': '停止中',
-                    'unknown': '未知'
-                };
-                return statusMap[status] || status;
-            }
-
-            updateBatchServiceOptions() {
-                const select = document.getElementById('batchServices');
-                select.innerHTML = this.services.map(service => 
-                    `<option value="${service.id}">${service.display_name || service.id}</option>`
-                ).join('');
-            }
-
-            async executeServiceScript(serviceId, script) {
-                const endpoint = `/api/services/${serviceId}/execute/${script}`;
-                document.getElementById('requestMethod').value = 'POST';
-                document.getElementById('apiEndpoint').value = endpoint;
-                document.getElementById('requestBody').value = '{}';
-                await this.sendRequest();
-            }
-
-            async executeBatch() {
-                const services = Array.from(document.getElementById('batchServices').selectedOptions)
-                    .map(option => option.value);
-                const script = document.getElementById('batchScript').value;
-                const paramsText = document.getElementById('batchParams').value;
-
-                if (services.length === 0) {
-                    this.log('错误', '请选择至少一个服务', null, 'error');
-                    return;
-                }
-
-                let params = {};
-                try {
-                    params = JSON.parse(paramsText);
-                } catch (error) {
-                    this.log('错误', '参数JSON格式无效', { error: error.message }, 'error');
-                    return;
-                }
-
-                const endpoint = `/api/services/batch/${script}`;
-                const body = {
-                    services: services,
-                    params: params
-                };
-
-                document.getElementById('requestMethod').value = 'POST';
-                document.getElementById('apiEndpoint').value = endpoint;
-                document.getElementById('requestBody').value = JSON.stringify(body, null, 2);
-                await this.sendRequest();
-            }
-
-            async startAllServices() {
-                const serviceIds = this.services.map(s => s.id);
-                const body = { services: serviceIds };
-                
-                document.getElementById('requestMethod').value = 'POST';
-                document.getElementById('apiEndpoint').value = '/api/services/batch/start';
-                document.getElementById('requestBody').value = JSON.stringify(body, null, 2);
-                await this.sendRequest();
-            }
-
-            async stopAllServices() {
-                const serviceIds = this.services.map(s => s.id);
-                const body = { services: serviceIds };
-                
-                document.getElementById('requestMethod').value = 'POST';
-                document.getElementById('apiEndpoint').value = '/api/services/batch/stop';
-                document.getElementById('requestBody').value = JSON.stringify(body, null, 2);
-                await this.sendRequest();
-            }
-
-            async getAllStatus() {
-                document.getElementById('requestMethod').value = 'GET';
-                document.getElementById('apiEndpoint').value = '/api/services/status/all';
-                document.getElementById('requestBody').value = '';
-                await this.sendRequest();
-            }
-
-            async reloadConfig() {
-                document.getElementById('requestMethod').value = 'POST';
-                document.getElementById('apiEndpoint').value = '/api/services/reload';
-                document.getElementById('requestBody').value = '{}';
-                await this.sendRequest();
-            }
-
-            async getHealth() {
-                document.getElementById('requestMethod').value = 'GET';
-                document.getElementById('apiEndpoint').value = '/api/health';
-                document.getElementById('requestBody').value = '';
-                await this.sendRequest();
-            }
-
-            log(type, message, data = null, level = 'response') {
-                const area = document.getElementById('responseArea');
-                const timestamp = new Date().toLocaleTimeString();
-                const entry = document.createElement('div');
-                entry.className = `log-entry ${level}`;
-                
-                let content = `<span class="timestamp">[${timestamp}]</span> `;
-                content += `<span class="method">${type}</span> `;
-                content += message;
-                
-                if (data) {
-                    content += '\n' + JSON.stringify(data, null, 2);
-                }
-                
-                entry.innerHTML = content;
-                area.appendChild(entry);
-                area.scrollTop = area.scrollHeight;
-            }
-
-            clearLogs() {
-                document.getElementById('responseArea').innerHTML = '';
-                this.log('系统', '日志已清空');
-            }
-        }
-
-        // 全局变量和函数
-        let debugger;
-
-        function switchTab(tabName) {
-            // 移除所有active类
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            
-            // 激活当前标签
-            event.target.classList.add('active');
-            document.getElementById(`tab-${tabName}`).classList.add('active');
-        }
-
-        function setEndpoint(method, endpoint) {
-            document.getElementById('requestMethod').value = method;
-            document.getElementById('apiEndpoint').value = endpoint;
-            
-            // 清空请求体（GET请求）
-            if (method === 'GET') {
-                document.getElementById('requestBody').value = '';
-            }
-        }
-
-        function sendRequest() {
-            debugger.sendRequest();
-        }
-
-        function clearLogs() {
-            debugger.clearLogs();
-        }
-
-        function loadServices() {
-            debugger.loadServices();
-        }
-
-        function refreshServices() {
-            debugger.refreshServices();
-        }
-
-        function executeBatch() {
-            debugger.executeBatch();
-        }
-
-        function startAllServices() {
-            debugger.startAllServices();
-        }
-
-        function stopAllServices() {
-            debugger.stopAllServices();
-        }
-
-        function getAllStatus() {
-            debugger.getAllStatus();
-        }
-
-        function reloadConfig() {
-            debugger.reloadConfig();
-        }
-
-        function getHealth() {
-            debugger.getHealth();
-        }
-
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', () => {
-            debugger = new APIDebugger();
-            
-            // 添加键盘快捷键
-            document.addEventListener('keydown', (e) => {
-                // Ctrl+Enter 发送请求
-                if (e.ctrlKey && e.key === 'Enter') {
-                    e.preventDefault();
-                    debugger.sendRequest();
-                }
-                
-                // Ctrl+L 清空日志
-                if (e.ctrlKey && e.key === 'l') {
-                    e.preventDefault();
-                    debugger.clearLogs();
-                }
-                
-                // Ctrl+R 刷新服务
-                if (e.ctrlKey && e.key === 'r') {
-                    e.preventDefault();
-                    debugger.refreshServices();
-                }
-            });
-            
-            // 自动格式化JSON
-            const requestBody = document.getElementById('requestBody');
-            requestBody.addEventListener('blur', () => {
-                try {
-                    const json = JSON.parse(requestBody.value);
-                    requestBody.value = JSON.stringify(json, null, 2);
-                } catch (error) {
-                    // 忽略JSON格式错误
-                }
-            });
-            
-            const batchParams = document.getElementById('batchParams');
-            batchParams.addEventListener('blur', () => {
-                try {
-                    const json = JSON.parse(batchParams.value);
-                    batchParams.value = JSON.stringify(json, null, 2);
-                } catch (error) {
-                    // 忽略JSON格式错误
-                }
-            });
-        });
-
-        // 工具函数
-        function formatJSON(str) {
-            try {
-                return JSON.stringify(JSON.parse(str), null, 2);
-            } catch (error) {
-                return str;
-            }
-        }
-
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                console.log('已复制到剪贴板');
-            });
-        }
-
-        // 导出日志功能
-        function exportLogs() {
-            const logs = document.getElementById('responseArea').innerText;
-            const blob = new Blob([logs], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `api-debug-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-    </script>
+    $('sendBtn').onclick = send;
+    $('clearBtn').onclick = ()=>{ state.logs=[]; render(); };
+    $('exportBtn').onclick= ()=>{ const blob=new Blob([JSON.stringify(state.logs,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='api-debug-logs.json'; a.click(); };
+    $('search').oninput = render;
+    connectWS();
+  }
+  init();
+})();
+</script>
 </body>
 </html>
