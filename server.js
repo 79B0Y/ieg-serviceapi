@@ -1,4 +1,3 @@
-// 加载服务信息
 const express = require('express');
 const WebSocket = require('ws');
 const { spawn } = require('child_process');
@@ -354,6 +353,131 @@ app.get(CONFIG.API_PREFIX + '/services/:serviceId/status', async (req, res) => {
             service: serviceId,
             status: 'error',
             error: error.message || error.error || 'Unknown error',
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// 全局状态检查接口 - 执行statuscheck.sh
+app.post(CONFIG.API_PREFIX + '/statuscheck/all', async (req, res) => {
+    const statusCheckScript = '/data/data/com.termux/files/home/servicemanager/statuscheck.sh';
+    
+    try {
+        console.log('执行全局状态检查: ' + statusCheckScript);
+        
+        // 广播开始执行
+        broadcast({
+            type: 'script_start',
+            service: 'system',
+            script: 'statuscheck',
+            timestamp: new Date().toISOString()
+        });
+        
+        const child = spawn('bash', [statusCheckScript], {
+            cwd: '/data/data/com.termux/files/home/servicemanager',
+            env: process.env,
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        let output = [];
+        
+        // 处理标准输出
+        child.stdout.on('data', (data) => {
+            const text = data.toString();
+            stdout += text;
+            
+            broadcast({
+                type: 'script_output',
+                service: 'system',
+                script: 'statuscheck',
+                output_type: 'stdout',
+                data: text,
+                timestamp: new Date().toISOString()
+            });
+            
+            output.push({ type: 'stdout', data: text, timestamp: new Date().toISOString() });
+        });
+        
+        // 处理标准错误
+        child.stderr.on('data', (data) => {
+            const text = data.toString();
+            stderr += text;
+            
+            broadcast({
+                type: 'script_output',
+                service: 'system',
+                script: 'statuscheck',
+                output_type: 'stderr',
+                data: text,
+                timestamp: new Date().toISOString()
+            });
+            
+            output.push({ type: 'stderr', data: text, timestamp: new Date().toISOString() });
+        });
+        
+        // 处理进程结束
+        child.on('close', (code) => {
+            const result = {
+                service: 'system',
+                script: 'statuscheck',
+                exitCode: code,
+                success: code === 0,
+                stdout: stdout,
+                stderr: stderr,
+                output: output,
+                timestamp: new Date().toISOString()
+            };
+            
+            broadcast({
+                type: 'script_complete',
+                service: 'system',
+                script: 'statuscheck',
+                exitCode: code,
+                success: code === 0,
+                stdout: stdout,
+                stderr: stderr,
+                output: output,
+                timestamp: new Date().toISOString()
+            });
+            
+            console.log('全局状态检查完成，退出码: ' + code);
+            
+            if (code === 0) {
+                res.json(result);
+            } else {
+                res.status(500).json(result);
+            }
+        });
+        
+        // 处理进程错误
+        child.on('error', (error) => {
+            console.error('全局状态检查执行错误:', error);
+            const errorResult = {
+                service: 'system',
+                script: 'statuscheck',
+                error: error.message,
+                success: false,
+                timestamp: new Date().toISOString()
+            };
+            
+            broadcast({
+                type: 'script_error',
+                service: 'system',
+                script: 'statuscheck',
+                error: error.message,
+                timestamp: new Date().toISOString()
+            });
+            
+            res.status(500).json(errorResult);
+        });
+        
+    } catch (error) {
+        console.error('启动全局状态检查失败:', error);
+        res.status(500).json({
+            error: '启动全局状态检查失败',
+            message: error.message,
             timestamp: new Date().toISOString()
         });
     }
