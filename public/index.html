@@ -31,6 +31,7 @@
             background-color: var(--bg-color);
             color: var(--text-primary);
             line-height: 1.6;
+            min-height: 100vh;
         }
 
         .container {
@@ -54,7 +55,7 @@
 
         .header h1 {
             color: var(--primary-color);
-            font-size: 2rem;
+            font-size: 1.8rem;
         }
 
         .header-controls {
@@ -67,10 +68,11 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 10px 20px;
+            padding: 8px 16px;
             border-radius: 20px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             font-weight: 500;
+            min-width: 120px;
         }
 
         .connection-status.connected {
@@ -102,6 +104,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
+            min-height: calc(100vh - 160px);
         }
 
         .card {
@@ -109,12 +112,14 @@
             border-radius: var(--border-radius);
             box-shadow: var(--shadow);
             padding: 20px;
+            display: flex;
+            flex-direction: column;
         }
 
         .card h2 {
             margin-bottom: 15px;
             color: var(--text-primary);
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             display: flex;
             align-items: center;
             gap: 10px;
@@ -129,6 +134,7 @@
             margin-bottom: 5px;
             font-weight: 500;
             color: var(--text-primary);
+            font-size: 0.9rem;
         }
 
         .form-group select, .form-group input {
@@ -148,29 +154,28 @@
 
         .service-status {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
             margin-bottom: 20px;
         }
 
         .status-item {
-            padding: 15px;
+            padding: 12px;
             border-radius: var(--border-radius);
             background: rgba(0,0,0,0.02);
             border: 1px solid var(--border-color);
-            position: relative;
         }
 
         .status-item h3 {
-            font-size: 0.9rem;
-            margin-bottom: 5px;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .status-value {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 600;
         }
 
@@ -192,22 +197,26 @@
 
         .controls {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 10px;
             margin-bottom: 15px;
         }
 
         .btn {
-            padding: 12px 20px;
+            padding: 10px 16px;
             border: none;
             border-radius: var(--border-radius);
             cursor: pointer;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             font-weight: 500;
             transition: all 0.2s ease;
             position: relative;
             overflow: hidden;
             text-align: center;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .btn:disabled {
@@ -220,19 +229,9 @@
             color: white;
         }
 
-        .btn-primary:hover:not(:disabled) {
-            background: #1976D2;
-            transform: translateY(-1px);
-        }
-
         .btn-success {
             background: var(--success-color);
             color: white;
-        }
-
-        .btn-success:hover:not(:disabled) {
-            background: #45a049;
-            transform: translateY(-1px);
         }
 
         .btn-warning {
@@ -240,19 +239,9 @@
             color: white;
         }
 
-        .btn-warning:hover:not(:disabled) {
-            background: #f57c00;
-            transform: translateY(-1px);
-        }
-
         .btn-danger {
             background: var(--error-color);
             color: white;
-        }
-
-        .btn-danger:hover:not(:disabled) {
-            background: #d32f2f;
-            transform: translateY(-1px);
         }
 
         .btn-secondary {
@@ -260,19 +249,14 @@
             color: white;
         }
 
-        .btn-secondary:hover:not(:disabled) {
-            background: #545b62;
-            transform: translateY(-1px);
-        }
-
         .btn-special {
             background: linear-gradient(45deg, #9c27b0, #673ab7);
             color: white;
         }
 
-        .btn-special:hover:not(:disabled) {
-            background: linear-gradient(45deg, #7b1fa2, #512da8);
+        .btn:hover:not(:disabled) {
             transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
 
         .btn.loading::after {
@@ -280,15 +264,14 @@
             position: absolute;
             width: 16px;
             height: 16px;
-            margin: auto;
             border: 2px solid transparent;
-            border-top-color: #ffffff;
+            border-top-color: currentColor;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+        }
+
+        .btn.loading {
+            color: transparent;
         }
 
         @keyframes spin {
@@ -296,24 +279,21 @@
             100% { transform: rotate(360deg); }
         }
 
-        .btn.loading {
-            color: transparent;
-        }
-
         .terminal {
-            height: 450px;
+            flex: 1;
             overflow-y: auto;
             background: #1e1e1e;
             color: #d4d4d4;
-            padding: 20px;
+            padding: 16px;
             border-radius: var(--border-radius);
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             line-height: 1.4;
+            min-height: 400px;
         }
 
         .terminal::-webkit-scrollbar {
-            width: 8px;
+            width: 6px;
         }
 
         .terminal::-webkit-scrollbar-track {
@@ -322,18 +302,14 @@
 
         .terminal::-webkit-scrollbar-thumb {
             background: #555;
-            border-radius: 4px;
-        }
-
-        .terminal::-webkit-scrollbar-thumb:hover {
-            background: #666;
+            border-radius: 3px;
         }
 
         .log-entry {
-            margin-bottom: 8px;
-            padding: 5px 0;
+            margin-bottom: 6px;
+            padding: 4px 0;
             border-left: 3px solid transparent;
-            padding-left: 10px;
+            padding-left: 8px;
         }
 
         .log-entry.stdout {
@@ -357,14 +333,14 @@
 
         .log-timestamp {
             color: #888;
-            font-size: 0.8rem;
-            margin-right: 10px;
+            font-size: 0.75rem;
+            margin-right: 8px;
         }
 
         .advanced-controls {
             display: none;
-            margin-top: 20px;
-            padding: 20px;
+            margin-top: 15px;
+            padding: 15px;
             background: rgba(0,0,0,0.02);
             border-radius: var(--border-radius);
             border: 1px solid var(--border-color);
@@ -375,9 +351,9 @@
         }
 
         .advanced-controls h3 {
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             color: var(--text-primary);
-            font-size: 1.1rem;
+            font-size: 1rem;
         }
 
         .toggle-advanced {
@@ -385,17 +361,17 @@
             border: none;
             color: var(--primary-color);
             cursor: pointer;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             text-decoration: underline;
-            margin-top: 10px;
+            margin-top: 8px;
         }
 
         .alert {
-            padding: 15px;
+            padding: 12px;
             border-radius: var(--border-radius);
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             border: 1px solid;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
 
         .alert.success {
@@ -410,12 +386,6 @@
             color: var(--error-color);
         }
 
-        .alert.info {
-            background: rgba(33, 150, 243, 0.1);
-            border-color: rgba(33, 150, 243, 0.3);
-            color: var(--primary-color);
-        }
-
         .alert.warning {
             background: rgba(255, 152, 0, 0.1);
             border-color: rgba(255, 152, 0, 0.3);
@@ -424,14 +394,14 @@
 
         .clear-terminal {
             float: right;
-            background: none;
+            background: #333;
             border: 1px solid #555;
             color: #d4d4d4;
-            padding: 5px 10px;
+            padding: 4px 8px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.8rem;
-            margin-bottom: 10px;
+            font-size: 0.75rem;
+            margin-bottom: 8px;
         }
 
         .clear-terminal:hover {
@@ -439,45 +409,52 @@
         }
 
         .service-info {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: var(--text-secondary);
-            margin-bottom: 15px;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: rgba(0,0,0,0.02);
+            border-radius: 4px;
         }
 
         .refresh-btn {
-            padding: 8px 16px;
+            padding: 6px 12px;
             background: var(--info-color);
             color: white;
             border: none;
             border-radius: var(--border-radius);
             cursor: pointer;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
         }
 
-        .refresh-btn:hover {
-            background: #1976D2;
-        }
-
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
             .main-grid {
                 grid-template-columns: 1fr;
+                gap: 15px;
             }
             
             .service-status {
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
             }
             
             .controls {
-                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                grid-template-columns: 1fr;
             }
             
             .header {
                 flex-direction: column;
                 text-align: center;
             }
+        }
+
+        @media (max-width: 640px) {
+            .service-status {
+                grid-template-columns: 1fr;
+            }
             
-            .header-controls {
-                justify-content: center;
+            .container {
+                padding: 10px;
             }
         }
     </style>
@@ -531,7 +508,7 @@
                     </div>
                 </div>
 
-                <h3>基础操作</h3>
+                <h3 style="font-size: 1rem; margin-bottom: 10px;">基础操作</h3>
                 <div class="controls">
                     <button class="btn btn-primary" onclick="executeScript('autocheck')">状态检查</button>
                     <button class="btn btn-success" onclick="executeScript('start')">启动服务</button>
@@ -539,8 +516,8 @@
                     <button class="btn btn-secondary" onclick="executeScript('backup')">创建备份</button>
                 </div>
 
-                <div class="controls" style="margin-top: 10px;">
-                    <button class="btn btn-special" onclick="executeGlobalStatusCheck()">全局状态检查</button>
+                <div style="margin-bottom: 10px;">
+                    <button class="btn btn-special" onclick="executeGlobalStatusCheck()" style="width: 100%;">全局状态检查</button>
                 </div>
 
                 <button class="toggle-advanced" onclick="toggleAdvanced()">显示高级选项</button>
@@ -559,7 +536,7 @@
             <div class="card">
                 <h2>
                     执行日志
-                    <button class="clear-terminal" onclick="clearTerminal()">清除日志</button>
+                    <button class="clear-terminal" onclick="clearTerminal()">清除</button>
                 </h2>
                 <div class="terminal" id="terminal"></div>
             </div>
@@ -576,16 +553,24 @@
                 this.currentExecutions = new Set();
                 this.currentService = '';
                 this.availableServices = [];
+                this.statusCheckInterval = null;
+                this.lastStatusCheck = 0;
                 
                 this.initWebSocket();
                 this.loadAvailableServices();
                 
-                // 定期刷新状态
-                setInterval(() => this.loadServiceStatus(), 30000);
+                // 防止过于频繁的状态检查
+                this.statusCheckInterval = setInterval(() => {
+                    const now = Date.now();
+                    if (now - this.lastStatusCheck > 60000) { // 最多每分钟检查一次
+                        this.loadServiceStatus();
+                    }
+                }, 60000);
             }
 
             async loadAvailableServices() {
                 try {
+                    this.addTerminalLog('正在加载服务列表...', 'info');
                     const response = await fetch(`${this.apiBase}/services`);
                     if (response.ok) {
                         const data = await response.json();
@@ -594,18 +579,16 @@
                         this.addTerminalLog(`服务列表加载完成: 找到 ${this.availableServices.length} 个服务`, 'info');
                         
                         // 自动选择第一个服务
-                        if (this.availableServices.length > 0) {
+                        if (this.availableServices.length > 0 && !this.currentService) {
                             this.currentService = this.availableServices[0].id;
                             document.getElementById('serviceSelector').value = this.currentService;
                             this.loadServiceStatus();
                         }
                     } else {
-                        this.addTerminalLog('无法加载服务列表，使用默认配置', 'warning');
-                        this.useDefaultService();
+                        throw new Error('HTTP ' + response.status);
                     }
                 } catch (error) {
-                    console.warn('加载服务列表失败:', error);
-                    this.addTerminalLog('加载服务列表失败: ' + error.message, 'warning');
+                    this.addTerminalLog('加载服务列表失败: ' + error.message, 'stderr');
                     this.useDefaultService();
                 }
             }
@@ -616,7 +599,7 @@
                 ];
                 this.updateServiceSelector();
                 this.currentService = 'hass';
-                this.loadServiceStatus();
+                this.addTerminalLog('使用默认服务配置', 'warning');
             }
 
             updateServiceSelector() {
@@ -670,7 +653,8 @@
                 this.updateServiceInfo();
                 if (this.currentService) {
                     this.addTerminalLog('切换到服务: ' + (this.getServiceDisplayName(this.currentService) || this.currentService), 'info');
-                    this.loadServiceStatus();
+                    // 延迟加载状态，避免立即触发
+                    setTimeout(() => this.loadServiceStatus(), 500);
                 }
             }
 
@@ -691,7 +675,7 @@
                         await this.loadAvailableServices();
                         this.addTerminalLog('服务列表已刷新', 'info');
                     } else {
-                        this.addTerminalLog('刷新服务列表失败', 'stderr');
+                        throw new Error('HTTP ' + response.status);
                     }
                 } catch (error) {
                     this.addTerminalLog('刷新服务列表失败: ' + error.message, 'stderr');
@@ -702,39 +686,44 @@
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsUrl = `${protocol}//${window.location.host}`;
                 
-                this.ws = new WebSocket(wsUrl);
-                
-                this.ws.onopen = () => {
-                    this.updateConnectionStatus(true);
-                    this.addTerminalLog('WebSocket连接已建立', 'info');
-                };
-                
-                this.ws.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        this.handleWebSocketMessage(data);
-                    } catch (error) {
-                        console.error('解析WebSocket消息失败:', error);
-                    }
-                };
-                
-                this.ws.onclose = () => {
-                    this.updateConnectionStatus(false);
-                    this.addTerminalLog('WebSocket连接已断开', 'warning');
+                try {
+                    this.ws = new WebSocket(wsUrl);
                     
-                    // 5秒后尝试重连
-                    setTimeout(() => {
-                        if (this.ws.readyState === WebSocket.CLOSED) {
-                            this.addTerminalLog('尝试重新连接...', 'info');
-                            this.initWebSocket();
+                    this.ws.onopen = () => {
+                        this.updateConnectionStatus(true);
+                        this.addTerminalLog('WebSocket连接已建立', 'info');
+                    };
+                    
+                    this.ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            this.handleWebSocketMessage(data);
+                        } catch (error) {
+                            console.error('解析WebSocket消息失败:', error);
                         }
-                    }, 5000);
-                };
-                
-                this.ws.onerror = (error) => {
-                    console.error('WebSocket错误:', error);
-                    this.addTerminalLog('WebSocket连接错误', 'stderr');
-                };
+                    };
+                    
+                    this.ws.onclose = () => {
+                        this.updateConnectionStatus(false);
+                        this.addTerminalLog('WebSocket连接已断开', 'warning');
+                        
+                        // 5秒后尝试重连
+                        setTimeout(() => {
+                            if (this.ws.readyState === WebSocket.CLOSED) {
+                                this.addTerminalLog('尝试重新连接WebSocket...', 'info');
+                                this.initWebSocket();
+                            }
+                        }, 5000);
+                    };
+                    
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket错误:', error);
+                        this.updateConnectionStatus(false);
+                    };
+                } catch (error) {
+                    console.error('WebSocket初始化失败:', error);
+                    this.updateConnectionStatus(false);
+                }
             }
 
             updateConnectionStatus(connected) {
@@ -749,9 +738,13 @@
             }
 
             handleWebSocketMessage(data) {
+                // 防止过度处理相同的消息
+                const messageKey = `${data.service}:${data.script}:${data.type}`;
+                const now = Date.now();
+                
                 switch (data.type) {
                     case 'connection':
-                        this.addTerminalLog(`连接确认: ${data.status}`, 'info');
+                        this.addTerminalLog('WebSocket连接确认', 'info');
                         break;
                     
                     case 'script_start':
@@ -761,7 +754,10 @@
                         break;
                     
                     case 'script_output':
-                        this.addTerminalLog(data.data, data.output_type, false);
+                        // 限制输出频率，避免刷屏
+                        if (data.data && data.data.trim()) {
+                            this.addTerminalLog(data.data.trim(), data.output_type, false);
+                        }
                         break;
                     
                     case 'script_complete':
@@ -777,9 +773,12 @@
                             `${completeServiceName} ${data.script} ${data.success ? '执行成功' : '执行失败'}`
                         );
                         
-                        // 如果是当前服务的状态检查，刷新状态显示
-                        if (data.script === 'autocheck' && data.service === this.currentService) {
-                            setTimeout(() => this.loadServiceStatus(), 1000);
+                        // 如果是当前服务的状态检查，延迟刷新状态显示（避免循环）
+                        if (data.script === 'autocheck' && data.service === this.currentService && data.success) {
+                            setTimeout(() => {
+                                this.lastStatusCheck = now;
+                                this.loadServiceStatus();
+                            }, 2000);
                         }
                         break;
                     
@@ -796,6 +795,13 @@
             async loadServiceStatus() {
                 if (!this.currentService) return;
                 
+                const now = Date.now();
+                // 防止过于频繁的状态检查
+                if (now - this.lastStatusCheck < 10000) {
+                    return;
+                }
+                this.lastStatusCheck = now;
+                
                 try {
                     const response = await fetch(`${this.apiBase}/services/${this.currentService}/status`);
                     let status;
@@ -804,29 +810,18 @@
                         status = await response.json();
                         this.updateStatusDisplay(status);
                     } else {
-                        // 尝试使用兼容性接口 (仅对hass有效)
-                        if (this.currentService === 'hass') {
-                            const fallbackResponse = await fetch(`${this.apiBase}/execute/autocheck`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ params: { json: true } })
-                            });
-                            if (fallbackResponse.ok) {
-                                const result = await fallbackResponse.json();
-                                if (result.success && result.stdout) {
-                                    status = JSON.parse(result.stdout.trim());
-                                    this.updateStatusDisplay(status);
-                                    return;
-                                }
-                            }
-                        }
-                        throw new Error('获取状态失败');
+                        // 静默处理错误，不要无限重试
+                        this.updateStatusDisplay({
+                            service: this.currentService,
+                            status: 'unknown',
+                            error: 'Status check failed'
+                        });
                     }
                 } catch (error) {
-                    console.error('获取服务状态失败:', error);
+                    // 静默处理网络错误
                     this.updateStatusDisplay({
                         service: this.currentService,
-                        status: 'error',
+                        status: 'unknown',
                         error: error.message
                     });
                 }
@@ -854,7 +849,7 @@
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ params })
+                        body: JSON.stringify({ params, timeout: 120000 })
                     });
 
                     if (!response.ok) {
@@ -863,7 +858,6 @@
                     }
 
                 } catch (error) {
-                    console.error(`执行${scriptName}失败:`, error);
                     this.addTerminalLog(`执行${scriptName}失败: ${error.message}`, 'stderr');
                     this.showAlert('error', `执行失败: ${error.message}`);
                     this.currentExecutions.delete(serviceKey);
@@ -878,7 +872,7 @@
                 }
 
                 this.currentExecutions.add('system:statuscheck');
-                this.addTerminalLog('请求执行: 全局状态检查 (statuscheck.sh)', 'info');
+                this.addTerminalLog('请求执行: 全局状态检查', 'info');
 
                 try {
                     const response = await fetch(`${this.apiBase}/statuscheck/all`, {
@@ -895,7 +889,6 @@
                     }
 
                 } catch (error) {
-                    console.error('执行全局状态检查失败:', error);
                     this.addTerminalLog('执行全局状态检查失败: ' + error.message, 'stderr');
                     this.showAlert('error', '执行失败: ' + error.message);
                     this.currentExecutions.delete('system:statuscheck');
@@ -967,6 +960,15 @@
             }
 
             addTerminalLog(message, type = 'stdout', addTimestamp = true) {
+                // 限制日志条数，防止内存溢出
+                const maxLogs = 200;
+                const entries = this.terminal.querySelectorAll('.log-entry');
+                if (entries.length > maxLogs) {
+                    for (let i = 0; i < entries.length - maxLogs + 10; i++) {
+                        entries[i].remove();
+                    }
+                }
+
                 const entry = document.createElement('div');
                 entry.className = `log-entry ${type}`;
                 
@@ -1031,6 +1033,16 @@
                     this.executeScript('restore', params);
                 }
             }
+
+            // 销毁方法，清理定时器
+            destroy() {
+                if (this.statusCheckInterval) {
+                    clearInterval(this.statusCheckInterval);
+                }
+                if (this.ws) {
+                    this.ws.close();
+                }
+            }
         }
 
         // 全局实例
@@ -1039,6 +1051,13 @@
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', () => {
             serviceManager = new IEGServiceManager();
+        });
+
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            if (serviceManager) {
+                serviceManager.destroy();
+            }
         });
 
         // 全局函数
