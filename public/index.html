@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Assistant 服务管理</title>
+    <title>IEG 服务管理中心</title>
     <style>
         :root {
             --primary-color: #2196F3;
             --success-color: #4CAF50;
             --error-color: #f44336;
             --warning-color: #ff9800;
+            --info-color: #2196F3;
             --bg-color: #f5f5f5;
             --card-bg: #ffffff;
             --text-primary: #333;
@@ -33,7 +34,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -47,11 +48,19 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
         }
 
         .header h1 {
             color: var(--primary-color);
             font-size: 2rem;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
 
         .connection-status {
@@ -106,11 +115,40 @@
             margin-bottom: 15px;
             color: var(--text-primary);
             font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-group select, .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            background: white;
+        }
+
+        .form-group select:focus, .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
         }
 
         .service-status {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
             margin-bottom: 20px;
         }
@@ -120,6 +158,7 @@
             border-radius: var(--border-radius);
             background: rgba(0,0,0,0.02);
             border: 1px solid var(--border-color);
+            position: relative;
         }
 
         .status-item h3 {
@@ -135,22 +174,27 @@
             font-weight: 600;
         }
 
-        .status-value.running {
+        .status-value.running, .status-value.success {
             color: var(--success-color);
         }
 
-        .status-value.stopped {
+        .status-value.stopped, .status-value.failed {
             color: var(--error-color);
         }
 
-        .status-value.starting {
+        .status-value.starting, .status-value.installing {
             color: var(--warning-color);
+        }
+
+        .status-value.unknown {
+            color: var(--text-secondary);
         }
 
         .controls {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 10px;
+            margin-bottom: 15px;
         }
 
         .btn {
@@ -163,6 +207,7 @@
             transition: all 0.2s ease;
             position: relative;
             overflow: hidden;
+            text-align: center;
         }
 
         .btn:disabled {
@@ -220,6 +265,16 @@
             transform: translateY(-1px);
         }
 
+        .btn-special {
+            background: linear-gradient(45deg, #9c27b0, #673ab7);
+            color: white;
+        }
+
+        .btn-special:hover:not(:disabled) {
+            background: linear-gradient(45deg, #7b1fa2, #512da8);
+            transform: translateY(-1px);
+        }
+
         .btn.loading::after {
             content: '';
             position: absolute;
@@ -246,7 +301,7 @@
         }
 
         .terminal {
-            height: 400px;
+            height: 450px;
             overflow-y: auto;
             background: #1e1e1e;
             color: #d4d4d4;
@@ -275,7 +330,7 @@
         }
 
         .log-entry {
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             padding: 5px 0;
             border-left: 3px solid transparent;
             padding-left: 10px;
@@ -309,7 +364,7 @@
         .advanced-controls {
             display: none;
             margin-top: 20px;
-            padding: 15px;
+            padding: 20px;
             background: rgba(0,0,0,0.02);
             border-radius: var(--border-radius);
             border: 1px solid var(--border-color);
@@ -319,29 +374,10 @@
             display: block;
         }
 
-        .form-group {
+        .advanced-controls h3 {
             margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
             color: var(--text-primary);
-        }
-
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid var(--border-color);
-            border-radius: var(--border-radius);
-            font-size: 0.9rem;
-        }
-
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+            font-size: 1.1rem;
         }
 
         .toggle-advanced {
@@ -359,6 +395,7 @@
             border-radius: var(--border-radius);
             margin-bottom: 15px;
             border: 1px solid;
+            font-size: 0.9rem;
         }
 
         .alert.success {
@@ -379,6 +416,12 @@
             color: var(--primary-color);
         }
 
+        .alert.warning {
+            background: rgba(255, 152, 0, 0.1);
+            border-color: rgba(255, 152, 0, 0.3);
+            color: var(--warning-color);
+        }
+
         .clear-terminal {
             float: right;
             background: none;
@@ -395,23 +438,46 @@
             background: #555;
         }
 
+        .service-info {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+
+        .refresh-btn {
+            padding: 8px 16px;
+            background: var(--info-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .refresh-btn:hover {
+            background: #1976D2;
+        }
+
         @media (max-width: 768px) {
             .main-grid {
                 grid-template-columns: 1fr;
             }
             
             .service-status {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             }
             
             .controls {
-                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             }
             
             .header {
                 flex-direction: column;
-                gap: 15px;
                 text-align: center;
+            }
+            
+            .header-controls {
+                justify-content: center;
             }
         }
     </style>
@@ -419,24 +485,33 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Home Assistant 服务管理</h1>
-            <div class="connection-status" id="connectionStatus">
-                <div class="status-indicator"></div>
-                <span>连接中...</span>
+            <h1>IEG 服务管理中心</h1>
+            <div class="header-controls">
+                <button class="refresh-btn" onclick="refreshServices()">刷新服务</button>
+                <div class="connection-status" id="connectionStatus">
+                    <div class="status-indicator"></div>
+                    <span>连接中...</span>
+                </div>
             </div>
         </div>
 
         <div class="main-grid">
             <div class="card">
-                <div class="form-group" style="margin-bottom: 20px;">
+                <h2>服务控制</h2>
+                
+                <div class="form-group">
                     <label for="serviceSelector">选择服务</label>
                     <select id="serviceSelector" onchange="switchService()">
-                        <option value="hass">Home Assistant</option>
+                        <option value="">加载中...</option>
                     </select>
                 </div>
 
-                <h2>服务状态</h2>
+                <div class="service-info" id="serviceInfo">
+                    正在加载服务信息...
+                </div>
+
                 <div id="alerts"></div>
+                
                 <div class="service-status" id="serviceStatus">
                     <div class="status-item">
                         <h3>运行状态</h3>
@@ -456,13 +531,16 @@
                     </div>
                 </div>
 
-                <h2>控制面板</h2>
+                <h3>基础操作</h3>
                 <div class="controls">
                     <button class="btn btn-primary" onclick="executeScript('autocheck')">状态检查</button>
                     <button class="btn btn-success" onclick="executeScript('start')">启动服务</button>
                     <button class="btn btn-warning" onclick="executeScript('stop')">停止服务</button>
                     <button class="btn btn-secondary" onclick="executeScript('backup')">创建备份</button>
-                    <button class="btn" onclick="executeGlobalStatusCheck()" style="background: #9c27b0; color: white;">全局状态检查</button>
+                </div>
+
+                <div class="controls" style="margin-top: 10px;">
+                    <button class="btn btn-special" onclick="executeGlobalStatusCheck()">全局状态检查</button>
                 </div>
 
                 <button class="toggle-advanced" onclick="toggleAdvanced()">显示高级选项</button>
@@ -489,19 +567,18 @@
     </div>
 
     <script>
-        class HAServiceManager {
+        class IEGServiceManager {
             constructor() {
                 this.ws = null;
                 this.apiBase = window.location.origin + '/ieg-serviceapi';
                 this.terminal = document.getElementById('terminal');
                 this.connectionStatus = document.getElementById('connectionStatus');
                 this.currentExecutions = new Set();
-                this.currentService = 'hass';
+                this.currentService = '';
                 this.availableServices = [];
                 
                 this.initWebSocket();
                 this.loadAvailableServices();
-                this.loadServiceStatus();
                 
                 // 定期刷新状态
                 setInterval(() => this.loadServiceStatus(), 30000);
@@ -514,14 +591,32 @@
                         const data = await response.json();
                         this.availableServices = data.services || [];
                         this.updateServiceSelector();
-                        this.addTerminalLog('服务列表加载完成: ' + this.availableServices.map(s => s.display_name || s.id).join(', '), 'info');
+                        this.addTerminalLog(`服务列表加载完成: 找到 ${this.availableServices.length} 个服务`, 'info');
+                        
+                        // 自动选择第一个服务
+                        if (this.availableServices.length > 0) {
+                            this.currentService = this.availableServices[0].id;
+                            document.getElementById('serviceSelector').value = this.currentService;
+                            this.loadServiceStatus();
+                        }
                     } else {
                         this.addTerminalLog('无法加载服务列表，使用默认配置', 'warning');
+                        this.useDefaultService();
                     }
                 } catch (error) {
                     console.warn('加载服务列表失败:', error);
                     this.addTerminalLog('加载服务列表失败: ' + error.message, 'warning');
+                    this.useDefaultService();
                 }
+            }
+
+            useDefaultService() {
+                this.availableServices = [
+                    { id: 'hass', display_name: 'Home Assistant', enabled: true }
+                ];
+                this.updateServiceSelector();
+                this.currentService = 'hass';
+                this.loadServiceStatus();
             }
 
             updateServiceSelector() {
@@ -529,10 +624,9 @@
                 selector.innerHTML = '';
                 
                 if (this.availableServices.length === 0) {
-                    // 默认服务
                     const option = document.createElement('option');
-                    option.value = 'hass';
-                    option.textContent = 'Home Assistant';
+                    option.value = '';
+                    option.textContent = '未找到可用服务';
                     selector.appendChild(option);
                 } else {
                     this.availableServices.forEach(service => {
@@ -546,20 +640,62 @@
                     });
                 }
                 
-                // 设置当前服务
-                this.currentService = selector.value;
+                this.updateServiceInfo();
+            }
+
+            updateServiceInfo() {
+                const serviceInfo = document.getElementById('serviceInfo');
+                if (this.currentService) {
+                    const service = this.availableServices.find(s => s.id === this.currentService);
+                    if (service) {
+                        const info = [];
+                        if (service.latest_service_version) {
+                            info.push(`最新版本: ${service.latest_service_version}`);
+                        }
+                        if (service.notes) {
+                            info.push(service.notes);
+                        }
+                        serviceInfo.textContent = info.length > 0 ? info.join(' | ') : '选中服务: ' + service.display_name;
+                    } else {
+                        serviceInfo.textContent = '服务信息不可用';
+                    }
+                } else {
+                    serviceInfo.textContent = '请选择一个服务';
+                }
             }
 
             switchService() {
                 const selector = document.getElementById('serviceSelector');
                 this.currentService = selector.value;
-                this.addTerminalLog('切换到服务: ' + (this.getServiceDisplayName(this.currentService) || this.currentService), 'info');
-                this.loadServiceStatus();
+                this.updateServiceInfo();
+                if (this.currentService) {
+                    this.addTerminalLog('切换到服务: ' + (this.getServiceDisplayName(this.currentService) || this.currentService), 'info');
+                    this.loadServiceStatus();
+                }
             }
 
             getServiceDisplayName(serviceId) {
                 const service = this.availableServices.find(s => s.id === serviceId);
                 return service ? service.display_name || service.id : serviceId;
+            }
+
+            async refreshServices() {
+                this.addTerminalLog('刷新服务列表...', 'info');
+                try {
+                    const response = await fetch(`${this.apiBase}/services/reload`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    if (response.ok) {
+                        await this.loadAvailableServices();
+                        this.addTerminalLog('服务列表已刷新', 'info');
+                    } else {
+                        this.addTerminalLog('刷新服务列表失败', 'stderr');
+                    }
+                } catch (error) {
+                    this.addTerminalLog('刷新服务列表失败: ' + error.message, 'stderr');
+                }
             }
 
             initWebSocket() {
@@ -658,21 +794,30 @@
             }
 
             async loadServiceStatus() {
+                if (!this.currentService) return;
+                
                 try {
-                    const response = await fetch(`${this.apiBase}/api/services/${this.currentService}/status`);
+                    const response = await fetch(`${this.apiBase}/services/${this.currentService}/status`);
                     let status;
                     
                     if (response.ok) {
                         status = await response.json();
                         this.updateStatusDisplay(status);
                     } else {
-                        // 尝试使用兼容性接口
+                        // 尝试使用兼容性接口 (仅对hass有效)
                         if (this.currentService === 'hass') {
-                            const fallbackResponse = await fetch(`${this.apiBase}/api/status`);
+                            const fallbackResponse = await fetch(`${this.apiBase}/execute/autocheck`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ params: { json: true } })
+                            });
                             if (fallbackResponse.ok) {
-                                status = await fallbackResponse.json();
-                                this.updateStatusDisplay(status);
-                                return;
+                                const result = await fallbackResponse.json();
+                                if (result.success && result.stdout) {
+                                    status = JSON.parse(result.stdout.trim());
+                                    this.updateStatusDisplay(status);
+                                    return;
+                                }
                             }
                         }
                         throw new Error('获取状态失败');
@@ -688,6 +833,11 @@
             }
 
             async executeScript(scriptName, params = {}) {
+                if (!this.currentService) {
+                    this.showAlert('warning', '请先选择一个服务');
+                    return;
+                }
+
                 const serviceKey = `${this.currentService}:${scriptName}`;
                 
                 if (this.currentExecutions.has(serviceKey)) {
@@ -699,7 +849,7 @@
                 this.addTerminalLog(`请求执行: ${this.getServiceDisplayName(this.currentService)} - ${scriptName}`, 'info');
 
                 try {
-                    const response = await fetch(`${this.apiBase}/api/services/${this.currentService}/execute/${scriptName}`, {
+                    const response = await fetch(`${this.apiBase}/services/${this.currentService}/execute/${scriptName}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -721,6 +871,37 @@
                 }
             }
 
+            async executeGlobalStatusCheck() {
+                if (this.currentExecutions.has('system:statuscheck')) {
+                    this.showAlert('warning', '全局状态检查正在执行中，请稍候...');
+                    return;
+                }
+
+                this.currentExecutions.add('system:statuscheck');
+                this.addTerminalLog('请求执行: 全局状态检查 (statuscheck.sh)', 'info');
+
+                try {
+                    const response = await fetch(`${this.apiBase}/statuscheck/all`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({})
+                    });
+
+                    if (!response.ok) {
+                        const result = await response.json();
+                        throw new Error(result.error || '执行失败');
+                    }
+
+                } catch (error) {
+                    console.error('执行全局状态检查失败:', error);
+                    this.addTerminalLog('执行全局状态检查失败: ' + error.message, 'stderr');
+                    this.showAlert('error', '执行失败: ' + error.message);
+                    this.currentExecutions.delete('system:statuscheck');
+                }
+            }
+
             updateStatusDisplay(status) {
                 const runStatus = document.getElementById('runStatus');
                 const installStatus = document.getElementById('installStatus');
@@ -728,20 +909,22 @@
                 const httpStatus = document.getElementById('httpStatus');
 
                 // 更新运行状态
-                runStatus.textContent = this.getStatusText(status.status || 'unknown');
-                runStatus.className = `status-value ${status.status || 'unknown'}`;
+                const statusText = this.getStatusText(status.status || status.run || 'unknown');
+                runStatus.textContent = statusText;
+                runStatus.className = `status-value ${status.status || status.run || 'unknown'}`;
 
                 // 更新安装状态
-                installStatus.textContent = status.install ? '已安装' : '未安装';
-                installStatus.className = `status-value ${status.install ? 'running' : 'stopped'}`;
+                const installText = status.install === true || status.install === 'success' ? '已安装' : '未安装';
+                installStatus.textContent = installText;
+                installStatus.className = `status-value ${status.install === true || status.install === 'success' ? 'success' : 'failed'}`;
 
                 // 更新版本信息
-                currentVersion.textContent = status.version || 'unknown';
+                currentVersion.textContent = status.version || status.current_version || 'unknown';
 
                 // 更新HTTP状态
-                const httpText = status.http_status === 'online' ? `端口${status.port}可用` : '不可用';
+                const httpText = status.http_status === 'online' ? `端口${status.port || 8123}可用` : '不可用';
                 httpStatus.textContent = httpText;
-                httpStatus.className = `status-value ${status.http_status === 'online' ? 'running' : 'stopped'}`;
+                httpStatus.className = `status-value ${status.http_status === 'online' ? 'success' : 'failed'}`;
             }
 
             getStatusText(status) {
@@ -751,42 +934,11 @@
                     'starting': '启动中',
                     'stopping': '停止中',
                     'failed': '失败',
+                    'success': '成功',
+                    'installing': '安装中',
                     'unknown': '未知'
                 };
                 return statusMap[status] || status;
-            }
-
-            async executeScript(scriptName, params = {}) {
-                if (this.currentExecutions.has(scriptName)) {
-                    this.showAlert('warning', `${scriptName} 正在执行中，请稍候...`);
-                    return;
-                }
-
-                this.currentExecutions.add(scriptName);
-                this.addTerminalLog(`请求执行: ${scriptName}`, 'info');
-
-                try {
-                    const response = await fetch(`${this.apiBase}/api/execute/${scriptName}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ params })
-                    });
-
-                    const result = await response.json();
-                    
-                    if (!response.ok) {
-                        throw new Error(result.error || '执行失败');
-                    }
-
-                } catch (error) {
-                    console.error(`执行${scriptName}失败:`, error);
-                    this.addTerminalLog(`执行${scriptName}失败: ${error.message}`, 'stderr');
-                    this.showAlert('error', `执行失败: ${error.message}`);
-                    this.currentExecutions.delete(scriptName);
-                    this.setButtonLoading(scriptName, false);
-                }
             }
 
             setButtonLoading(scriptName, isLoading) {
@@ -846,34 +998,37 @@
                 }, 3000);
             }
 
-            async executeGlobalStatusCheck() {
-                if (this.currentExecutions.has('system:statuscheck')) {
-                    this.showAlert('warning', '全局状态检查正在执行中，请稍候...');
-                    return;
+            clearTerminal() {
+                this.terminal.innerHTML = '';
+                this.addTerminalLog('日志已清除', 'info');
+            }
+
+            showInstallDialog() {
+                const version = prompt('请输入要安装的服务版本 (留空使用默认版本):');
+                if (version !== null) {
+                    const params = version.trim() ? { env: { TARGET_VERSION: version.trim() } } : {};
+                    this.executeScript('install', params);
                 }
+            }
 
-                this.currentExecutions.add('system:statuscheck');
-                this.addTerminalLog('请求执行: 全局状态检查 (statuscheck.sh)', 'info');
+            showUpdateDialog() {
+                const version = prompt('请输入要更新到的服务版本 (留空使用最新版本):');
+                if (version !== null) {
+                    const params = version.trim() ? { env: { TARGET_VERSION: version.trim() } } : {};
+                    this.executeScript('update', params);
+                }
+            }
 
-                try {
-                    const response = await fetch(`${this.apiBase}/statuscheck/all`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({})
-                    });
-
-                    if (!response.ok) {
-                        const result = await response.json();
-                        throw new Error(result.error || '执行失败');
-                    }
-
-                } catch (error) {
-                    console.error('执行全局状态检查失败:', error);
-                    this.addTerminalLog('执行全局状态检查失败: ' + error.message, 'stderr');
-                    this.showAlert('error', '执行失败: ' + error.message);
-                    this.currentExecutions.delete('system:statuscheck');
+            showRestoreDialog() {
+                const choice = confirm('选择还原方式:\n确定 - 使用备份文件还原\n取消 - 生成默认配置');
+                
+                if (choice) {
+                    const file = prompt('请输入备份文件路径 (留空使用最新备份):');
+                    const params = file ? { env: { RESTORE_FILE: file } } : {};
+                    this.executeScript('restore', params);
+                } else {
+                    const params = { config: true };
+                    this.executeScript('restore', params);
                 }
             }
         }
@@ -883,7 +1038,7 @@
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', () => {
-            serviceManager = new HAServiceManager();
+            serviceManager = new IEGServiceManager();
         });
 
         // 全局函数
@@ -893,6 +1048,10 @@
 
         function switchService() {
             serviceManager.switchService();
+        }
+
+        function refreshServices() {
+            serviceManager.refreshServices();
         }
 
         function toggleAdvanced() {
@@ -913,32 +1072,19 @@
         }
 
         function showInstallDialog() {
-            const version = prompt('请输入要安装的Home Assistant版本 (留空使用默认版本):');
-            if (version !== null) {
-                const params = version.trim() ? { env: { TARGET_VERSION: version.trim() } } : {};
-                serviceManager.executeScript('install', params);
-            }
+            serviceManager.showInstallDialog();
         }
 
         function showUpdateDialog() {
-            const version = prompt('请输入要更新到的Home Assistant版本 (留空使用最新版本):');
-            if (version !== null) {
-                const params = version.trim() ? { env: { TARGET_VERSION: version.trim() } } : {};
-                serviceManager.executeScript('update', params);
-            }
+            serviceManager.showUpdateDialog();
         }
 
         function showRestoreDialog() {
-            const choice = confirm('选择还原方式:\n确定 - 使用备份文件还原\n取消 - 生成默认配置');
-            
-            if (choice) {
-                const file = prompt('请输入备份文件路径 (留空使用最新备份):');
-                const params = file ? { env: { RESTORE_FILE: file } } : {};
-                serviceManager.executeScript('restore', params);
-            } else {
-                const params = { config: true };
-                serviceManager.executeScript('restore', params);
-            }
+            serviceManager.showRestoreDialog();
+        }
+
+        function executeGlobalStatusCheck() {
+            serviceManager.executeGlobalStatusCheck();
         }
     </script>
 </body>
