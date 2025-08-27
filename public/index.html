@@ -428,6 +428,13 @@
 
         <div class="main-grid">
             <div class="card">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="serviceSelector">选择服务</label>
+                    <select id="serviceSelector" onchange="switchService()">
+                        <option value="hass">Home Assistant</option>
+                    </select>
+                </div>
+
                 <h2>服务状态</h2>
                 <div id="alerts"></div>
                 <div class="service-status" id="serviceStatus">
@@ -484,16 +491,74 @@
         class HAServiceManager {
             constructor() {
                 this.ws = null;
-                this.apiBase = window.location.origin;
+                this.apiBase = window.location.origin + '/ieg-serviceapi';
                 this.terminal = document.getElementById('terminal');
                 this.connectionStatus = document.getElementById('connectionStatus');
                 this.currentExecutions = new Set();
+                this.currentService = 'hass';
+                this.availableServices = [];
                 
                 this.initWebSocket();
+                this.loadAvailableServices();
                 this.loadServiceStatus();
                 
                 // 定期刷新状态
                 setInterval(() => this.loadServiceStatus(), 30000);
+            }
+
+            async loadAvailableServices() {
+                try {
+                    const response = await fetch(`${this.apiBase}/services`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.availableServices = data.services || [];
+                        this.updateServiceSelector();
+                        this.addTerminalLog('服务列表加载完成: ' + this.availableServices.map(s => s.display_name || s.id).join(', '), 'info');
+                    } else {
+                        this.addTerminalLog('无法加载服务列表，使用默认配置', 'warning');
+                    }
+                } catch (error) {
+                    console.warn('加载服务列表失败:', error);
+                    this.addTerminalLog('加载服务列表失败: ' + error.message, 'warning');
+                }
+            }
+
+            updateServiceSelector() {
+                const selector = document.getElementById('serviceSelector');
+                selector.innerHTML = '';
+                
+                if (this.availableServices.length === 0) {
+                    // 默认服务
+                    const option = document.createElement('option');
+                    option.value = 'hass';
+                    option.textContent = 'Home Assistant';
+                    selector.appendChild(option);
+                } else {
+                    this.availableServices.forEach(service => {
+                        const option = document.createElement('option');
+                        option.value = service.id;
+                        option.textContent = service.display_name || service.id;
+                        if (service.notes) {
+                            option.title = service.notes;
+                        }
+                        selector.appendChild(option);
+                    });
+                }
+                
+                // 设置当前服务
+                this.currentService = selector.value;
+            }
+
+            switchService() {
+                const selector = document.getElementById('serviceSelector');
+                this.currentService = selector.value;
+                this.addTerminalLog('切换到服务: ' + (this.getServiceDisplayName(this.currentService) || this.currentService), 'info');
+                this.loadServiceStatus();
+            }
+
+            getServiceDisplayName(serviceId) {
+                const service = this.availableServices.find(s => s.id === serviceId);
+                return service ? service.display_name || service.id : serviceId;
             }
 
             initWebSocket() {
@@ -553,7 +618,8 @@
                         break;
                     
                     case 'script_start':
-                        this.addTerminalLog(`开始执行: ${data.script}`, 'info');
+                        const serviceName = this.getServiceDisplayName(data.service);
+                        this.addTerminalLog(`开始执行: ${serviceName} - ${data.script}`, 'info');
                         this.setButtonLoading(data.script, true);
                         break;
                     
@@ -562,45 +628,95 @@
                         break;
                     
                     case 'script_complete':
-                        this.addTerminalLog(`执行完成: ${data.script} (退出码: ${data.exitCode})`, 
+                        const completeServiceName = this.getServiceDisplayName(data.service);
+                        this.addTerminalLog(`执行完成: ${completeServiceName} - ${data.script} (退出码: ${data.exitCode})`, 
                             data.success ? 'info' : 'stderr');
                         this.setButtonLoading(data.script, false);
-                        this.currentExecutions.delete(data.script);
+                        this.currentExecutions.delete(`${data.service}:${data.script}`);
                         
                         // 显示结果提醒
                         this.showAlert(
                             data.success ? 'success' : 'error',
-                            `${data.script} ${data.success ? '执行成功' : '执行失败'}`
+                            `${completeServiceName} ${data.script} ${data.success ? '执行成功' : '执行失败'}`
                         );
                         
-                        // 如果是状态检查，刷新状态显示
-                        if (data.script === 'autocheck') {
+                        // 如果是当前服务的状态检查，刷新状态显示
+                        if (data.script === 'autocheck' && data.service === this.currentService) {
                             setTimeout(() => this.loadServiceStatus(), 1000);
                         }
                         break;
                     
                     case 'script_error':
-                        this.addTerminalLog(`执行错误: ${data.script} - ${data.error}`, 'stderr');
+                        const errorServiceName = this.getServiceDisplayName(data.service);
+                        this.addTerminalLog(`执行错误: ${errorServiceName} - ${data.script} - ${data.error}`, 'stderr');
                         this.setButtonLoading(data.script, false);
-                        this.currentExecutions.delete(data.script);
-                        this.showAlert('error', `${data.script} 执行错误: ${data.error}`);
+                        this.currentExecutions.delete(`${data.service}:${data.script}`);
+                        this.showAlert('error', `${errorServiceName} ${data.script} 执行错误: ${data.error}`);
                         break;
                 }
             }
 
             async loadServiceStatus() {
                 try {
-                    const response = await fetch(`${this.apiBase}/api/status`);
-                    const status = await response.json();
+                    const response = await fetch(`${this.apiBase}/api/services/${this.currentService}/status`);
+                    let status;
                     
                     if (response.ok) {
+                        status = await response.json();
                         this.updateStatusDisplay(status);
                     } else {
-                        throw new Error(status.error || '获取状态失败');
+                        // 尝试使用兼容性接口
+                        if (this.currentService === 'hass') {
+                            const fallbackResponse = await fetch(`${this.apiBase}/api/status`);
+                            if (fallbackResponse.ok) {
+                                status = await fallbackResponse.json();
+                                this.updateStatusDisplay(status);
+                                return;
+                            }
+                        }
+                        throw new Error('获取状态失败');
                     }
                 } catch (error) {
                     console.error('获取服务状态失败:', error);
-                    this.showAlert('error', `获取状态失败: ${error.message}`);
+                    this.updateStatusDisplay({
+                        service: this.currentService,
+                        status: 'error',
+                        error: error.message
+                    });
+                }
+            }
+
+            async executeScript(scriptName, params = {}) {
+                const serviceKey = `${this.currentService}:${scriptName}`;
+                
+                if (this.currentExecutions.has(serviceKey)) {
+                    this.showAlert('warning', `${this.getServiceDisplayName(this.currentService)} 的 ${scriptName} 正在执行中，请稍候...`);
+                    return;
+                }
+
+                this.currentExecutions.add(serviceKey);
+                this.addTerminalLog(`请求执行: ${this.getServiceDisplayName(this.currentService)} - ${scriptName}`, 'info');
+
+                try {
+                    const response = await fetch(`${this.apiBase}/api/services/${this.currentService}/execute/${scriptName}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ params })
+                    });
+
+                    if (!response.ok) {
+                        const result = await response.json();
+                        throw new Error(result.error || '执行失败');
+                    }
+
+                } catch (error) {
+                    console.error(`执行${scriptName}失败:`, error);
+                    this.addTerminalLog(`执行${scriptName}失败: ${error.message}`, 'stderr');
+                    this.showAlert('error', `执行失败: ${error.message}`);
+                    this.currentExecutions.delete(serviceKey);
+                    this.setButtonLoading(scriptName, false);
                 }
             }
 
@@ -746,6 +862,10 @@
         // 全局函数
         function executeScript(scriptName) {
             serviceManager.executeScript(scriptName);
+        }
+
+        function switchService() {
+            serviceManager.switchService();
         }
 
         function toggleAdvanced() {
