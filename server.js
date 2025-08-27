@@ -31,33 +31,105 @@ const CONFIG = {
 // 全局变量存储服务信息
 let servicesInfo = {};
 
-// 加载服务更新信息
-function loadServicesInfo() {
+// 扫描服务目录作为备用方案
+function scanServiceDirectories() {
+    console.log('Scanning service directories as fallback...');
+    const scannedServices = {};
+    
     try {
-        if (fs.existsSync(CONFIG.SERVICE_UPDATE_FILE)) {
-            const data = fs.readFileSync(CONFIG.SERVICE_UPDATE_FILE, 'utf8');
-            const serviceData = JSON.parse(data);
-            
-            servicesInfo = {};
-            if (serviceData.services && Array.isArray(serviceData.services)) {
-                serviceData.services.forEach(service => {
-                    if (service.id && service.enabled !== false) {
-                        servicesInfo[service.id] = Object.assign({}, service, {
-                            service_dir: path.join(CONFIG.BASE_SERVICE_DIR, service.id)
-                        });
-                    }
-                });
-            }
-            
-            console.log('已加载 ' + Object.keys(servicesInfo).length + ' 个服务:', Object.keys(servicesInfo).join(', '));
-            return true;
-        } else {
-            console.warn('serviceupdate.json 文件不存在');
+        if (!fs.existsSync(CONFIG.BASE_SERVICE_DIR)) {
+            console.warn('Base service directory does not exist:', CONFIG.BASE_SERVICE_DIR);
             return false;
         }
+        
+        const dirs = fs.readdirSync(CONFIG.BASE_SERVICE_DIR);
+        dirs.forEach(dirName => {
+            const servicePath = path.join(CONFIG.BASE_SERVICE_DIR, dirName);
+            const autocheckPath = path.join(servicePath, 'autocheck.sh');
+            
+            if (fs.statSync(servicePath).isDirectory() && fs.existsSync(autocheckPath)) {
+                scannedServices[dirName] = {
+                    id: dirName,
+                    display_name: dirName.charAt(0).toUpperCase() + dirName.slice(1),
+                    enabled: true,
+                    service_dir: servicePath,
+                    scanned: true
+                };
+                console.log('Discovered service via directory scan:', dirName);
+            }
+        });
+        
+        servicesInfo = scannedServices;
+        return Object.keys(scannedServices).length > 0;
     } catch (error) {
-        console.error('加载服务信息失败:', error);
+        console.error('Directory scan failed:', error);
         return false;
+    }
+}
+
+// 加载服务更新信息 - 修复版本
+function loadServicesInfo() {
+    servicesInfo = {};
+    
+    try {
+        // 首先验证基础目录存在
+        if (!fs.existsSync(CONFIG.BASE_SERVICE_DIR)) {
+            console.error('Base service directory does not exist:', CONFIG.BASE_SERVICE_DIR);
+            return false;
+        }
+        
+        // 检查serviceupdate.json是否存在
+        if (!fs.existsSync(CONFIG.SERVICE_UPDATE_FILE)) {
+            console.warn('serviceupdate.json not found, falling back to directory scan');
+            return scanServiceDirectories();
+        }
+        
+        const data = fs.readFileSync(CONFIG.SERVICE_UPDATE_FILE, 'utf8');
+        const serviceData = JSON.parse(data);
+        
+        if (!serviceData.services || !Array.isArray(serviceData.services)) {
+            console.error('Invalid serviceupdate.json format: missing or invalid services array');
+            return scanServiceDirectories();
+        }
+        
+        let loadedCount = 0;
+        serviceData.services.forEach(service => {
+            // 修复条件判断逻辑
+            if (service.id && service.enabled === true) {
+                const serviceDir = path.join(CONFIG.BASE_SERVICE_DIR, service.id);
+                const autocheckScript = path.join(serviceDir, 'autocheck.sh');
+                
+                // 验证服务目录和关键脚本存在
+                if (fs.existsSync(serviceDir) && fs.existsSync(autocheckScript)) {
+                    servicesInfo[service.id] = Object.assign({}, service, {
+                        service_dir: serviceDir,
+                        display_name: service.display_name || service.id
+                    });
+                    loadedCount++;
+                    console.log('Loaded service:', service.id);
+                } else {
+                    console.warn(`Service ${service.id} configured but directory or autocheck.sh missing`);
+                    console.warn(`  Directory exists: ${fs.existsSync(serviceDir)}`);
+                    console.warn(`  autocheck.sh exists: ${fs.existsSync(autocheckScript)}`);
+                }
+            } else if (service.id && service.enabled !== true) {
+                console.log(`Service ${service.id} disabled (enabled=${service.enabled})`);
+            }
+        });
+        
+        console.log(`Successfully loaded ${loadedCount} services from serviceupdate.json`);
+        
+        // 如果没有加载到任何服务，尝试目录扫描
+        if (loadedCount === 0) {
+            console.warn('No services loaded from serviceupdate.json, trying directory scan');
+            return scanServiceDirectories();
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Failed to load service info:', error);
+        console.log('Attempting directory scan as fallback...');
+        return scanServiceDirectories();
     }
 }
 
@@ -74,16 +146,16 @@ const clients = new Set();
 
 // WebSocket连接处理
 wss.on('connection', (ws, request) => {
-    console.log('WebSocket客户端已连接');
+    console.log('WebSocket client connected');
     clients.add(ws);
     
     ws.on('close', () => {
-        console.log('WebSocket客户端已断开');
+        console.log('WebSocket client disconnected');
         clients.delete(ws);
     });
     
     ws.on('error', (error) => {
-        console.error('WebSocket错误:', error);
+        console.error('WebSocket error:', error);
         clients.delete(ws);
     });
     
@@ -99,7 +171,12 @@ function broadcast(data) {
     const message = JSON.stringify(data);
     clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
+            try {
+                client.send(message);
+            } catch (error) {
+                console.error('Broadcast error:', error);
+                clients.delete(client);
+            }
         }
     });
 }
@@ -109,7 +186,9 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
     return new Promise((resolve, reject) => {
         // 检查服务是否存在
         if (!servicesInfo[serviceId]) {
-            reject(new Error('服务不存在: ' + serviceId));
+            const error = new Error(`Service not found: ${serviceId}`);
+            error.available_services = Object.keys(servicesInfo);
+            reject(error);
             return;
         }
         
@@ -118,7 +197,7 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
         
         // 检查脚本是否存在
         if (!fs.existsSync(scriptPath)) {
-            reject(new Error('脚本不存在: ' + scriptPath));
+            reject(new Error(`Script not found: ${scriptPath}`));
             return;
         }
         
@@ -132,7 +211,7 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
         // 设置环境变量
         const env = Object.assign({}, process.env, params.env || {});
         
-        console.log('执行脚本: ' + serviceId + '/' + scriptName + ' - ' + scriptPath + ' ' + args.join(' '));
+        console.log(`Executing script: ${serviceId}/${scriptName} - ${scriptPath} ${args.join(' ')}`);
         
         // 广播开始执行
         broadcast({
@@ -215,7 +294,7 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
                 timestamp: new Date().toISOString()
             });
             
-            console.log('脚本 ' + serviceId + '/' + scriptName + ' 执行完成，退出码: ' + code);
+            console.log(`Script ${serviceId}/${scriptName} completed with exit code: ${code}`);
             
             if (code === 0) {
                 resolve(result);
@@ -243,7 +322,7 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
                 timestamp: new Date().toISOString()
             });
             
-            console.error('脚本 ' + serviceId + '/' + scriptName + ' 执行错误:', error);
+            console.error(`Script ${serviceId}/${scriptName} execution error:`, error);
             reject(errorResult);
         });
         
@@ -254,7 +333,7 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
                 reject({
                     service: serviceId,
                     script: scriptName,
-                    error: '执行超时',
+                    error: 'Execution timeout',
                     success: false,
                     timestamp: new Date().toISOString()
                 });
@@ -264,14 +343,21 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
 }
 
 // API路由 - 使用统一前缀
+
+// 健康检查 - 增强版本
 app.get(CONFIG.API_PREFIX + '/health', (req, res) => {
-    res.json({
+    const health = {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         service: 'IEG Service Manager API',
         version: '1.0.0',
-        loaded_services: Object.keys(servicesInfo).length
-    });
+        loaded_services: Object.keys(servicesInfo).length,
+        services: Object.keys(servicesInfo),
+        config_file_exists: fs.existsSync(CONFIG.SERVICE_UPDATE_FILE),
+        base_dir_exists: fs.existsSync(CONFIG.BASE_SERVICE_DIR),
+        websocket_clients: clients.size
+    };
+    res.json(health);
 });
 
 // 获取所有服务列表
@@ -281,11 +367,12 @@ app.get(CONFIG.API_PREFIX + '/services', (req, res) => {
         return {
             id: id,
             display_name: service.display_name || id,
-            latest_script_version: service.latest_script_version,
-            latest_service_version: service.latest_service_version,
+            latest_script_version: service.latest_script_version || 'unknown',
+            latest_service_version: service.latest_service_version || 'unknown',
             enabled: service.enabled !== false,
             notes: service.notes || '',
-            service_dir: service.service_dir
+            service_dir: service.service_dir,
+            scanned: service.scanned || false
         };
     });
     
@@ -620,13 +707,15 @@ app.post(CONFIG.API_PREFIX + '/execute/:scriptName', async (req, res) => {
     }
 });
 
-// 错误处理中间件
+// 统一错误处理中间件
 app.use((error, req, res, next) => {
     console.error('API错误:', error);
     res.status(500).json({
         error: '内部服务器错误',
         message: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        path: req.path,
+        method: req.method
     });
 });
 
@@ -636,6 +725,13 @@ app.use((req, res) => {
         error: '接口不存在',
         path: req.path,
         method: req.method,
+        available_endpoints: [
+            'GET ' + CONFIG.API_PREFIX + '/health',
+            'GET ' + CONFIG.API_PREFIX + '/services',
+            'POST ' + CONFIG.API_PREFIX + '/services/reload',
+            'POST ' + CONFIG.API_PREFIX + '/services/{id}/execute/{script}',
+            'POST ' + CONFIG.API_PREFIX + '/services/batch/{script}'
+        ],
         timestamp: new Date().toISOString()
     });
 });
