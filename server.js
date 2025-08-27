@@ -28,17 +28,22 @@ const CONFIG = {
     }
 };
 
+// 执行锁机制 - 防止无限循环
+const executionTracker = new Map();
+const lastExecution = new Map();
+const broadcastThrottle = new Map();
+
 // 全局变量存储服务信息
 let servicesInfo = {};
 
 // 扫描服务目录作为备用方案
 function scanServiceDirectories() {
-    console.log('Scanning service directories as fallback...');
+    console.log('[SCAN] Scanning service directories as fallback...');
     const scannedServices = {};
     
     try {
         if (!fs.existsSync(CONFIG.BASE_SERVICE_DIR)) {
-            console.warn('Base service directory does not exist:', CONFIG.BASE_SERVICE_DIR);
+            console.warn('[SCAN] Base service directory does not exist:', CONFIG.BASE_SERVICE_DIR);
             return false;
         }
         
@@ -47,40 +52,49 @@ function scanServiceDirectories() {
             const servicePath = path.join(CONFIG.BASE_SERVICE_DIR, dirName);
             const autocheckPath = path.join(servicePath, 'autocheck.sh');
             
-            if (fs.statSync(servicePath).isDirectory() && fs.existsSync(autocheckPath)) {
+            // 跳过文件和特殊目录
+            if (!fs.statSync(servicePath).isDirectory()) return;
+            if (dirName.startsWith('.')) return;
+            
+            if (fs.existsSync(autocheckPath)) {
                 scannedServices[dirName] = {
                     id: dirName,
                     display_name: dirName.charAt(0).toUpperCase() + dirName.slice(1),
                     enabled: true,
                     service_dir: servicePath,
-                    scanned: true
+                    scanned: true,
+                    latest_script_version: 'unknown',
+                    latest_service_version: 'unknown'
                 };
-                console.log('Discovered service via directory scan:', dirName);
+                console.log('[SCAN] Discovered service:', dirName);
+            } else {
+                console.log('[SCAN] Skipped directory without autocheck.sh:', dirName);
             }
         });
         
         servicesInfo = scannedServices;
         return Object.keys(scannedServices).length > 0;
     } catch (error) {
-        console.error('Directory scan failed:', error);
+        console.error('[SCAN] Directory scan failed:', error);
         return false;
     }
 }
 
 // 加载服务更新信息 - 修复版本
 function loadServicesInfo() {
+    console.log('[LOAD] Loading service information...');
     servicesInfo = {};
     
     try {
         // 首先验证基础目录存在
         if (!fs.existsSync(CONFIG.BASE_SERVICE_DIR)) {
-            console.error('Base service directory does not exist:', CONFIG.BASE_SERVICE_DIR);
+            console.error('[LOAD] Base service directory does not exist:', CONFIG.BASE_SERVICE_DIR);
             return false;
         }
         
         // 检查serviceupdate.json是否存在
         if (!fs.existsSync(CONFIG.SERVICE_UPDATE_FILE)) {
-            console.warn('serviceupdate.json not found, falling back to directory scan');
+            console.warn('[LOAD] serviceupdate.json not found, falling back to directory scan');
             return scanServiceDirectories();
         }
         
@@ -88,13 +102,13 @@ function loadServicesInfo() {
         const serviceData = JSON.parse(data);
         
         if (!serviceData.services || !Array.isArray(serviceData.services)) {
-            console.error('Invalid serviceupdate.json format: missing or invalid services array');
+            console.error('[LOAD] Invalid serviceupdate.json format: missing or invalid services array');
             return scanServiceDirectories();
         }
         
         let loadedCount = 0;
         serviceData.services.forEach(service => {
-            // 修复条件判断逻辑
+            // 修复条件判断逻辑 - 只加载明确启用的服务
             if (service.id && service.enabled === true) {
                 const serviceDir = path.join(CONFIG.BASE_SERVICE_DIR, service.id);
                 const autocheckScript = path.join(serviceDir, 'autocheck.sh');
@@ -106,35 +120,38 @@ function loadServicesInfo() {
                         display_name: service.display_name || service.id
                     });
                     loadedCount++;
-                    console.log('Loaded service:', service.id);
+                    console.log('[LOAD] Loaded service:', service.id);
                 } else {
-                    console.warn(`Service ${service.id} configured but directory or autocheck.sh missing`);
-                    console.warn(`  Directory exists: ${fs.existsSync(serviceDir)}`);
-                    console.warn(`  autocheck.sh exists: ${fs.existsSync(autocheckScript)}`);
+                    console.warn(`[LOAD] Service ${service.id} configured but directory or autocheck.sh missing`);
+                    console.warn(`[LOAD]   Directory exists: ${fs.existsSync(serviceDir)}`);
+                    console.warn(`[LOAD]   autocheck.sh exists: ${fs.existsSync(autocheckScript)}`);
                 }
             } else if (service.id && service.enabled !== true) {
-                console.log(`Service ${service.id} disabled (enabled=${service.enabled})`);
+                console.log(`[LOAD] Service ${service.id} disabled (enabled=${service.enabled})`);
             }
         });
         
-        console.log(`Successfully loaded ${loadedCount} services from serviceupdate.json`);
+        console.log(`[LOAD] Successfully loaded ${loadedCount} services from serviceupdate.json`);
         
         // 如果没有加载到任何服务，尝试目录扫描
         if (loadedCount === 0) {
-            console.warn('No services loaded from serviceupdate.json, trying directory scan');
+            console.warn('[LOAD] No services loaded from serviceupdate.json, trying directory scan');
             return scanServiceDirectories();
         }
         
         return true;
     } catch (error) {
-        console.error('Failed to load service info:', error);
-        console.log('Attempting directory scan as fallback...');
+        console.error('[LOAD] Failed to load service info:', error);
+        console.log('[LOAD] Attempting directory scan as fallback...');
         return scanServiceDirectories();
     }
 }
 
-// 定期重新加载服务信息 (每5分钟)
-setInterval(loadServicesInfo, 5 * 60 * 1000);
+// 定期重新加载服务信息 (每10分钟，减少频率)
+setInterval(() => {
+    console.log('[RELOAD] Periodic service info reload...');
+    loadServicesInfo();
+}, 10 * 60 * 1000);
 
 // 中间件
 app.use(cors());
@@ -146,16 +163,16 @@ const clients = new Set();
 
 // WebSocket连接处理
 wss.on('connection', (ws, request) => {
-    console.log('WebSocket client connected');
+    console.log('[WS] WebSocket client connected');
     clients.add(ws);
     
     ws.on('close', () => {
-        console.log('WebSocket client disconnected');
+        console.log('[WS] WebSocket client disconnected');
         clients.delete(ws);
     });
     
     ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
+        console.error('[WS] WebSocket error:', error);
         clients.delete(ws);
     });
     
@@ -166,24 +183,73 @@ wss.on('connection', (ws, request) => {
     }));
 });
 
-// 向所有连接的客户端广播消息
+// 向所有连接的客户端广播消息 - 添加节流控制
 function broadcast(data) {
+    const messageKey = `${data.service || 'system'}:${data.script || 'unknown'}:${data.type}`;
+    const now = Date.now();
+    
+    // 对于script_output类型的消息进行节流
+    if (data.type === 'script_output') {
+        const lastBroadcast = broadcastThrottle.get(messageKey) || 0;
+        if (now - lastBroadcast < 1000) { // 1秒内最多广播一次相同的输出
+            return;
+        }
+        broadcastThrottle.set(messageKey, now);
+    }
+    
     const message = JSON.stringify(data);
+    let successCount = 0;
+    
     clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
             try {
                 client.send(message);
+                successCount++;
             } catch (error) {
-                console.error('Broadcast error:', error);
+                console.error('[WS] Broadcast error:', error);
                 clients.delete(client);
             }
         }
     });
+    
+    // 只对重要消息记录日志
+    if (['script_start', 'script_complete', 'script_error'].includes(data.type)) {
+        console.log(`[WS] Broadcasted ${data.type} to ${successCount} clients`);
+    }
 }
 
-// 扩展的脚本执行函数 - 支持多服务
+// 扩展的脚本执行函数 - 修复版本，添加执行锁
 function executeServiceScript(serviceId, scriptName, params = {}, options = {}) {
     return new Promise((resolve, reject) => {
+        const executionKey = `${serviceId}:${scriptName}`;
+        const now = Date.now();
+        
+        // 防止同一脚本在短时间内重复执行
+        const lastTime = lastExecution.get(executionKey) || 0;
+        if (now - lastTime < 10000) { // 10秒内不允许重复执行
+            const elapsed = Math.round((now - lastTime) / 1000);
+            console.log(`[EXEC] Skipping ${executionKey} - executed ${elapsed}s ago (too soon)`);
+            reject(new Error(`Script executed too recently (${elapsed}s ago)`));
+            return;
+        }
+        
+        // 检查是否已在执行中
+        if (executionTracker.has(executionKey)) {
+            const startTime = executionTracker.get(executionKey);
+            const elapsed = now - startTime;
+            
+            // 如果执行时间超过5分钟，认为是僵尸进程，清除锁
+            if (elapsed > 300000) {
+                console.warn(`[EXEC] Execution timeout detected for ${executionKey}, clearing lock`);
+                executionTracker.delete(executionKey);
+            } else {
+                const elapsedSeconds = Math.round(elapsed / 1000);
+                console.log(`[EXEC] Script ${executionKey} already executing (${elapsedSeconds}s)`);
+                reject(new Error(`Script ${executionKey} is already executing (${elapsedSeconds}s)`));
+                return;
+            }
+        }
+
         // 检查服务是否存在
         if (!servicesInfo[serviceId]) {
             const error = new Error(`Service not found: ${serviceId}`);
@@ -200,6 +266,10 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
             reject(new Error(`Script not found: ${scriptPath}`));
             return;
         }
+
+        // 设置执行锁和记录
+        executionTracker.set(executionKey, now);
+        lastExecution.set(executionKey, now);
         
         // 构建执行参数
         const args = [];
@@ -211,7 +281,7 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
         // 设置环境变量
         const env = Object.assign({}, process.env, params.env || {});
         
-        console.log(`Executing script: ${serviceId}/${scriptName} - ${scriptPath} ${args.join(' ')}`);
+        console.log(`[EXEC] Starting: ${serviceId}/${scriptName} - ${scriptPath} ${args.join(' ')}`);
         
         // 广播开始执行
         broadcast({
@@ -231,21 +301,25 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
         let stdout = '';
         let stderr = '';
         let output = [];
+        let outputCount = 0;
         
-        // 处理标准输出
+        // 处理标准输出 - 限制输出频率
         child.stdout.on('data', (data) => {
             const text = data.toString();
             stdout += text;
+            outputCount++;
             
-            // 实时广播输出
-            broadcast({
-                type: 'script_output',
-                service: serviceId,
-                script: scriptName,
-                output_type: 'stdout',
-                data: text,
-                timestamp: new Date().toISOString()
-            });
+            // 限制实时广播频率
+            if (outputCount % 5 === 0 || text.includes('完成') || text.includes('错误')) {
+                broadcast({
+                    type: 'script_output',
+                    service: serviceId,
+                    script: scriptName,
+                    output_type: 'stdout',
+                    data: text,
+                    timestamp: new Date().toISOString()
+                });
+            }
             
             output.push({ type: 'stdout', data: text, timestamp: new Date().toISOString() });
         });
@@ -255,7 +329,7 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
             const text = data.toString();
             stderr += text;
             
-            // 实时广播错误
+            // 错误输出总是广播
             broadcast({
                 type: 'script_output',
                 service: serviceId,
@@ -270,6 +344,9 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
         
         // 处理进程结束
         child.on('close', (code) => {
+            // 清除执行锁
+            executionTracker.delete(executionKey);
+            
             const result = {
                 service: serviceId,
                 script: scriptName,
@@ -294,7 +371,7 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
                 timestamp: new Date().toISOString()
             });
             
-            console.log(`Script ${serviceId}/${scriptName} completed with exit code: ${code}`);
+            console.log(`[EXEC] Completed: ${serviceId}/${scriptName} (exit code: ${code})`);
             
             if (code === 0) {
                 resolve(result);
@@ -305,6 +382,9 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
         
         // 处理进程错误
         child.on('error', (error) => {
+            // 清除执行锁
+            executionTracker.delete(executionKey);
+            
             const errorResult = {
                 service: serviceId,
                 script: scriptName,
@@ -322,14 +402,23 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
                 timestamp: new Date().toISOString()
             });
             
-            console.error(`Script ${serviceId}/${scriptName} execution error:`, error);
+            console.error(`[EXEC] Error: ${serviceId}/${scriptName} - ${error.message}`);
             reject(errorResult);
         });
         
-        // 设置执行超时
-        if (options.timeout) {
-            setTimeout(() => {
+        // 设置执行超时 - 默认2分钟
+        const timeout = options.timeout || 120000;
+        setTimeout(() => {
+            if (executionTracker.has(executionKey)) {
+                console.warn(`[EXEC] Timeout: ${executionKey}, killing process`);
                 child.kill('SIGTERM');
+                setTimeout(() => {
+                    if (executionTracker.has(executionKey)) {
+                        child.kill('SIGKILL');
+                        executionTracker.delete(executionKey);
+                    }
+                }, 5000);
+                
                 reject({
                     service: serviceId,
                     script: scriptName,
@@ -337,8 +426,8 @@ function executeServiceScript(serviceId, scriptName, params = {}, options = {}) 
                     success: false,
                     timestamp: new Date().toISOString()
                 });
-            }, options.timeout);
-        }
+            }
+        }, timeout);
     });
 }
 
@@ -350,12 +439,13 @@ app.get(CONFIG.API_PREFIX + '/health', (req, res) => {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         service: 'IEG Service Manager API',
-        version: '1.0.0',
+        version: '1.1.0',
         loaded_services: Object.keys(servicesInfo).length,
         services: Object.keys(servicesInfo),
         config_file_exists: fs.existsSync(CONFIG.SERVICE_UPDATE_FILE),
         base_dir_exists: fs.existsSync(CONFIG.BASE_SERVICE_DIR),
-        websocket_clients: clients.size
+        websocket_clients: clients.size,
+        active_executions: executionTracker.size
     };
     res.json(health);
 });
@@ -415,7 +505,7 @@ app.get(CONFIG.API_PREFIX + '/services/:serviceId/status', async (req, res) => {
     }
     
     try {
-        const result = await executeServiceScript(serviceId, 'autocheck', { json: true });
+        const result = await executeServiceScript(serviceId, 'autocheck', { json: true, quiet: true });
         if (result.success && result.stdout) {
             try {
                 const status = JSON.parse(result.stdout.trim());
@@ -436,6 +526,7 @@ app.get(CONFIG.API_PREFIX + '/services/:serviceId/status', async (req, res) => {
             });
         }
     } catch (error) {
+        console.log(`[STATUS] Failed to get status for ${serviceId}: ${error.message || error.error}`);
         res.json({
             service: serviceId,
             status: 'error',
@@ -449,8 +540,25 @@ app.get(CONFIG.API_PREFIX + '/services/:serviceId/status', async (req, res) => {
 app.post(CONFIG.API_PREFIX + '/statuscheck/all', async (req, res) => {
     const statusCheckScript = '/data/data/com.termux/files/home/servicemanager/statuscheck.sh';
     
+    if (!fs.existsSync(statusCheckScript)) {
+        return res.status(404).json({
+            error: '全局状态检查脚本不存在',
+            script_path: statusCheckScript,
+            timestamp: new Date().toISOString()
+        });
+    }
+    
+    // 防止重复执行
+    if (executionTracker.has('system:statuscheck')) {
+        return res.status(409).json({
+            error: '全局状态检查正在执行中',
+            timestamp: new Date().toISOString()
+        });
+    }
+    
     try {
-        console.log('执行全局状态检查: ' + statusCheckScript);
+        console.log('[GLOBAL] Starting global status check');
+        executionTracker.set('system:statuscheck', Date.now());
         
         // 广播开始执行
         broadcast({
@@ -506,6 +614,8 @@ app.post(CONFIG.API_PREFIX + '/statuscheck/all', async (req, res) => {
         
         // 处理进程结束
         child.on('close', (code) => {
+            executionTracker.delete('system:statuscheck');
+            
             const result = {
                 service: 'system',
                 script: 'statuscheck',
@@ -529,7 +639,7 @@ app.post(CONFIG.API_PREFIX + '/statuscheck/all', async (req, res) => {
                 timestamp: new Date().toISOString()
             });
             
-            console.log('全局状态检查完成，退出码: ' + code);
+            console.log(`[GLOBAL] Status check completed (exit code: ${code})`);
             
             if (code === 0) {
                 res.json(result);
@@ -540,7 +650,8 @@ app.post(CONFIG.API_PREFIX + '/statuscheck/all', async (req, res) => {
         
         // 处理进程错误
         child.on('error', (error) => {
-            console.error('全局状态检查执行错误:', error);
+            executionTracker.delete('system:statuscheck');
+            
             const errorResult = {
                 service: 'system',
                 script: 'statuscheck',
@@ -557,11 +668,21 @@ app.post(CONFIG.API_PREFIX + '/statuscheck/all', async (req, res) => {
                 timestamp: new Date().toISOString()
             });
             
+            console.error('[GLOBAL] Status check error:', error);
             res.status(500).json(errorResult);
         });
         
+        // 设置超时
+        setTimeout(() => {
+            if (executionTracker.has('system:statuscheck')) {
+                child.kill('SIGTERM');
+                executionTracker.delete('system:statuscheck');
+            }
+        }, 300000); // 5分钟超时
+        
     } catch (error) {
-        console.error('启动全局状态检查失败:', error);
+        executionTracker.delete('system:statuscheck');
+        console.error('[GLOBAL] Failed to start status check:', error);
         res.status(500).json({
             error: '启动全局状态检查失败',
             message: error.message,
@@ -597,7 +718,18 @@ app.post(CONFIG.API_PREFIX + '/services/:serviceId/execute/:scriptName', async (
         const result = await executeServiceScript(serviceId, scriptName, params, { timeout: timeout });
         res.json(result);
     } catch (error) {
-        res.status(500).json(error);
+        // 如果是执行频率限制，返回429状态码
+        if (error.message && error.message.includes('too recently')) {
+            res.status(429).json({
+                error: '执行过于频繁',
+                message: error.message,
+                service: serviceId,
+                script: scriptName,
+                timestamp: new Date().toISOString()
+            });
+        } else {
+            res.status(500).json(error);
+        }
     }
 });
 
@@ -626,14 +758,14 @@ app.post(CONFIG.API_PREFIX + '/services/batch/:scriptName', async (req, res) => 
     const results = [];
     const errors = [];
     
-    // 并行执行所有服务
-    const promises = services.map(async (serviceId) => {
+    // 串行执行避免系统过载
+    for (const serviceId of services) {
         if (!servicesInfo[serviceId]) {
             errors.push({
                 service: serviceId,
                 error: '服务不存在'
             });
-            return;
+            continue;
         }
         
         try {
@@ -642,9 +774,10 @@ app.post(CONFIG.API_PREFIX + '/services/batch/:scriptName', async (req, res) => 
         } catch (error) {
             errors.push(Object.assign({ service: serviceId }, error));
         }
-    });
-    
-    await Promise.allSettled(promises);
+        
+        // 批量操作间隔，避免系统过载
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
     
     res.json({
         script: scriptName,
@@ -673,6 +806,8 @@ app.post(CONFIG.API_PREFIX + '/services/reload', (req, res) => {
 app.get(CONFIG.API_PREFIX + '/websocket/clients', (req, res) => {
     res.json({
         connected_clients: clients.size,
+        active_executions: executionTracker.size,
+        execution_keys: Array.from(executionTracker.keys()),
         timestamp: new Date().toISOString()
     });
 });
@@ -688,7 +823,8 @@ app.post(CONFIG.API_PREFIX + '/execute/:scriptName', async (req, res) => {
     if (!servicesInfo[serviceId]) {
         return res.status(404).json({
             error: 'Home Assistant服务未配置',
-            message: '请使用新的多服务API: ' + CONFIG.API_PREFIX + '/services/{serviceId}/execute/{scriptName}'
+            message: '请使用新的多服务API: ' + CONFIG.API_PREFIX + '/services/{serviceId}/execute/{scriptName}',
+            available_services: Object.keys(servicesInfo)
         });
     }
     
@@ -709,7 +845,7 @@ app.post(CONFIG.API_PREFIX + '/execute/:scriptName', async (req, res) => {
 
 // 统一错误处理中间件
 app.use((error, req, res, next) => {
-    console.error('API错误:', error);
+    console.error('[ERROR] API error:', error);
     res.status(500).json({
         error: '内部服务器错误',
         message: error.message,
@@ -729,44 +865,110 @@ app.use((req, res) => {
             'GET ' + CONFIG.API_PREFIX + '/health',
             'GET ' + CONFIG.API_PREFIX + '/services',
             'POST ' + CONFIG.API_PREFIX + '/services/reload',
+            'GET ' + CONFIG.API_PREFIX + '/services/{id}/status',
             'POST ' + CONFIG.API_PREFIX + '/services/{id}/execute/{script}',
-            'POST ' + CONFIG.API_PREFIX + '/services/batch/{script}'
+            'POST ' + CONFIG.API_PREFIX + '/services/batch/{script}',
+            'POST ' + CONFIG.API_PREFIX + '/statuscheck/all',
+            'GET ' + CONFIG.API_PREFIX + '/websocket/clients'
         ],
         timestamp: new Date().toISOString()
     });
 });
 
+// 清理定时器 - 每小时清理过期的执行记录
+setInterval(() => {
+    const now = Date.now();
+    const expireTime = 3600000; // 1小时
+    
+    // 清理过期的执行记录
+    for (const [key, timestamp] of lastExecution.entries()) {
+        if (now - timestamp > expireTime) {
+            lastExecution.delete(key);
+        }
+    }
+    
+    // 清理过期的广播节流记录
+    for (const [key, timestamp] of broadcastThrottle.entries()) {
+        if (now - timestamp > 60000) { // 1分钟
+            broadcastThrottle.delete(key);
+        }
+    }
+    
+    console.log(`[CLEANUP] Cleaned execution records, remaining: ${lastExecution.size}`);
+}, 3600000);
+
 // 启动服务器
 server.listen(CONFIG.PORT, () => {
+    console.log('='.repeat(60));
     console.log('IEG服务管理API已启动');
     console.log('HTTP服务器: http://localhost:' + CONFIG.PORT);
     console.log('WebSocket服务器: ws://localhost:' + CONFIG.PORT);
     console.log('API前缀: ' + CONFIG.API_PREFIX);
     console.log('基础服务目录: ' + CONFIG.BASE_SERVICE_DIR);
+    console.log('配置文件: ' + CONFIG.SERVICE_UPDATE_FILE);
+    console.log('='.repeat(60));
     
     // 加载服务信息
     const success = loadServicesInfo();
     if (success) {
         console.log('✓ 服务配置加载成功');
         console.log('✓ 可用服务: ' + Object.keys(servicesInfo).join(', '));
+        console.log('✓ 总计 ' + Object.keys(servicesInfo).length + ' 个服务');
     } else {
         console.warn('⚠ 服务配置加载失败，将以兼容模式运行');
     }
+    
+    console.log('='.repeat(60));
+    console.log('访问地址:');
+    console.log('  主界面: http://localhost:' + CONFIG.PORT);
+    console.log('  调试界面: http://localhost:' + CONFIG.PORT + '/debug.html');
+    console.log('  健康检查: http://localhost:' + CONFIG.PORT + CONFIG.API_PREFIX + '/health');
+    console.log('  服务列表: http://localhost:' + CONFIG.PORT + CONFIG.API_PREFIX + '/services');
+    console.log('='.repeat(60));
 });
 
-// 优雅关闭
-process.on('SIGTERM', () => {
-    console.log('收到SIGTERM信号，正在优雅关闭...');
+// 优雅关闭处理
+function gracefulShutdown(signal) {
+    console.log(`\n[SHUTDOWN] 收到${signal}信号，正在优雅关闭...`);
+    
+    // 停止接受新的连接
     server.close(() => {
-        console.log('HTTP服务器已关闭');
-        process.exit(0);
+        console.log('[SHUTDOWN] HTTP服务器已关闭');
+        
+        // 关闭所有WebSocket连接
+        clients.forEach(client => {
+            client.close(1000, 'Server shutdown');
+        });
+        console.log('[SHUTDOWN] WebSocket连接已关闭');
+        
+        // 等待正在执行的脚本完成或强制终止
+        if (executionTracker.size > 0) {
+            console.log(`[SHUTDOWN] 等待 ${executionTracker.size} 个正在执行的脚本完成...`);
+            
+            setTimeout(() => {
+                console.log('[SHUTDOWN] 强制退出');
+                process.exit(0);
+            }, 10000); // 10秒后强制退出
+        } else {
+            process.exit(0);
+        }
     });
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// 捕获未处理的异常
+process.on('uncaughtException', (error) => {
+    console.error('[FATAL] Uncaught Exception:', error);
+    console.error('[FATAL] Stack trace:', error.stack);
+    
+    // 给正在执行的操作一点时间完成
+    setTimeout(() => {
+        process.exit(1);
+    }, 1000);
 });
 
-process.on('SIGINT', () => {
-    console.log('收到SIGINT信号，正在优雅关闭...');
-    server.close(() => {
-        console.log('HTTP服务器已关闭');
-        process.exit(0);
-    });
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[FATAL] Unhandled Rejection at:', promise, 'reason:', reason);
 });
